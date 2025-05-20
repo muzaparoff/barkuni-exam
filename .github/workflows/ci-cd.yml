@@ -89,9 +89,13 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Terraform Init
-        run: terraform init -backend=false
+        run: |
+          cd terraform
+          terraform init -backend=false
       - name: Terraform Apply
-        run: terraform apply -auto-approve
+        run: |
+          cd terraform
+          terraform apply -auto-approve
       - name: Configure Kubectl
         run: |
           aws eks update-kubeconfig --name $CLUSTER_NAME --region $AWS_DEFAULT_REGION
