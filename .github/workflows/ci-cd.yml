@@ -89,7 +89,9 @@ jobs:
   deploy:
     needs: [build-and-push, manage-certificates]
     runs-on: ubuntu-latest
-    container: hashicorp/terraform:1.5.0
+    container:
+      image: muzaparoff/terraform-runner:latest
+      options: --platform=linux/amd64
     env:
       AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
       AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
@@ -97,28 +99,6 @@ jobs:
       CLUSTER_NAME: barkuni-eks
     steps:
       - uses: actions/checkout@v4
-      - name: Install AWS CLI
-        run: |
-          apk add --no-cache curl unzip
-          curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
-          unzip awscliv2.zip
-          ./aws/install --bin-dir /usr/local/bin --install-dir /usr/local/aws-cli --update || true
-          export PATH=$PATH:/usr/local/bin:/usr/local/aws-cli/v2/current/bin
-      - name: Symlink AWS CLI if needed
-        run: |
-          export PATH=$PATH:/usr/local/bin:/usr/local/aws-cli/v2/current/bin
-          if [ ! -f /usr/local/bin/aws ]; then
-            if [ -f /usr/local/aws-cli/v2/current/bin/aws ]; then
-              ln -s /usr/local/aws-cli/v2/current/bin/aws /usr/local/bin/aws
-            else
-              echo "AWS CLI binary not found!" && exit 1
-            fi
-          fi
-      - name: Verify AWS CLI install
-        run: |
-          export PATH=$PATH:/usr/local/bin:/usr/local/aws-cli/v2/current/bin
-          ls -l /usr/local/bin/aws
-          /usr/local/bin/aws --version
       - name: Terraform Init
         run: |
           cd terraform
@@ -145,9 +125,6 @@ jobs:
       - name: Configure Kubectl
         run: |
           aws eks update-kubeconfig --name $CLUSTER_NAME --region $AWS_DEFAULT_REGION
-      - name: Install Helm
-        run: |
-          curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
       - name: Create barkuni Namespace
         run: |
           kubectl get namespace barkuni || kubectl create namespace barkuni
@@ -157,6 +134,9 @@ jobs:
             --cert=./certs/tls.crt \
             --key=./certs/tls.key \
             --namespace barkuni || true
+      - name: Install Helm
+        run: |
+          curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
       - name: Deploy with Helm
         run: |
           helm upgrade --install barkuni-api ./helm/barkuni-api \
@@ -185,12 +165,10 @@ jobs:
             --set image.repository=${{ secrets.DOCKERHUB_USERNAME }}/barkuni-api \
             --set image.tag=${{ needs.build-and-push.outputs.tags }} \
             --namespace barkuni \
-          helm upgrade --install barkuni-api ./helm/barkuni-api \
-            --dry-run=client -o yaml | kubectl apply -f - \
-            --namespace barkuni \            --set serviceAccount.create=true \            --set persistence.size=8Gi \            --set persistence.accessModes={ReadWriteOnce} \            --set persistence.storageClass=gp2 \            --set persistence.enabled=true \            --set autoscaling.targetCPUUtilizationPercentage=50 \            --set autoscaling.maxReplicas=10 \            --set autoscaling.minReplicas=2 \            --set autoscaling.enabled=true \            --set resources.requests.memory=256Mi \            --set resources.requests.cpu=250m \            --set resources.limits.memory=512Mi \            --set resources.limits.cpu=500m \            --set env.PORT=8000 \            --set env.NODE_ENV=production \            --set service.name=barkuni-api \            --set service.targetPort=8000 \            --set service.port=80 \            --set service.type=ClusterIP \            --set image.pullPolicy=IfNotPresent \            --set image.repository=${{ secrets.DOCKERHUB_USERNAME }}/barkuni-api \            --set image.tag=${{ needs.build-and-push.outputs.tags }} \            --namespace barkuni \          helm upgrade --install barkuni-api ./helm/barkuni-api \        run: |      - name: Deploy with Helm            --dry-run=client -o yaml | kubectl apply -f -            --namespace barkuni \            --key=./certs/tls.key \          helm upgrade --install barkuni ./helm/barkuni \
-            --key=./certs/tls.key \}}/barkuni-api \
-          helm upgrade --install barkuni ./helm/barkuni \ needs.version.outputs.version }} \
-
-
-
-            --wait --timeout 5m            --set image.tag=${{ needs.version.outputs.version }} \            --set image.repository=${{ secrets.DOCKERHUB_USERNAME }}/barkuni-api \            --wait --timeout 5m
+            --wait --timeout 5m  
+      - name: Wait for Deployment
+        run: |
+          kubectl rollout status deployment/barkuni-api --namespace barkuni --timeout=5m
+      - name: Wait for Service
+        run: |
+          kubectl wait --for=condition=available --timeout=5m deployment/barkuni-api --namespace barkuni
