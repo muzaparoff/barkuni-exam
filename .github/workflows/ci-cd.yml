@@ -107,6 +107,17 @@ jobs:
         run: |
           cd terraform
           terraform init -backend=false
+      - name: Terraform Import Existing Resources
+        run: |
+          cd terraform
+          # Import KMS alias if it exists
+          if aws kms list-aliases --region $AWS_DEFAULT_REGION | grep -q 'alias/eks/barkuni-cluster'; then
+            terraform import 'module.eks.module.kms.aws_kms_alias.this["cluster"]' arn:aws:kms:$AWS_DEFAULT_REGION:$(aws sts get-caller-identity --query Account --output text):alias/eks/barkuni-cluster || true
+          fi
+          # Import CloudWatch log group if it exists
+          if aws logs describe-log-groups --log-group-name-prefix /aws/eks/barkuni-cluster/cluster --region $AWS_DEFAULT_REGION | grep -q '/aws/eks/barkuni-cluster/cluster'; then
+            terraform import 'module.eks.aws_cloudwatch_log_group.this[0]' /aws/eks/barkuni-cluster/cluster || true
+          fi
       - name: Terraform Apply
         run: |
           cd terraform
