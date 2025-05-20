@@ -102,7 +102,7 @@ jobs:
           apk add --no-cache curl unzip
           curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
           unzip awscliv2.zip
-          ./aws/install
+          ./aws/install --bin-dir /usr/local/bin --install-dir /usr/local/aws-cli --update
       - name: Terraform Init
         run: |
           cd terraform
@@ -117,6 +117,10 @@ jobs:
           # Import CloudWatch log group if it exists
           if aws logs describe-log-groups --log-group-name-prefix /aws/eks/barkuni-cluster/cluster --region $AWS_DEFAULT_REGION | grep -q '/aws/eks/barkuni-cluster/cluster'; then
             terraform import 'module.eks.aws_cloudwatch_log_group.this[0]' /aws/eks/barkuni-cluster/cluster || true
+          fi
+          # Import IAM role if it exists
+          if aws iam get-role --role-name eks-alb-ingress-controller; then
+            terraform import aws_iam_role.alb_ingress_controller eks-alb-ingress-controller || true
           fi
       - name: Terraform Apply
         run: |

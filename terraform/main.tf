@@ -112,7 +112,7 @@ resource "aws_route53_record" "app" {
 
   alias {
     name                   = module.eks.cluster_endpoint
-    zone_id                = module.eks.cluster_arn
+    zone_id                = data.aws_route53_zone.main.zone_id
     evaluate_target_health = true
   }
 }
