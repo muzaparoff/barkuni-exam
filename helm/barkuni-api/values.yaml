@@ -1,0 +1,46 @@
+# Default values for barkuni-api Helm chart.
+
+# Namespace where the application will be deployed
+namespace: barkuni
+
+# Service configuration
+service:
+  name: barkuni-api
+  type: ClusterIP
+  port: 80
+  targetPort: 8000
+
+# Image configuration
+image:
+  repository: ""
+  tag: ""
+  pullPolicy: IfNotPresent
+
+# Resources configuration
+resources:
+  requests:
+    cpu: 250m
+    memory: 256Mi
+  limits:
+    cpu: 500m
+    memory: 512Mi
+
+# Autoscaling configuration
+autoscaling:
+  enabled: true
+  minReplicas: 2
+  maxReplicas: 10
+  targetCPUUtilizationPercentage: 50
+
+# Persistence configuration
+persistence:
+  enabled: true
+  storageClass: gp2
+  accessModes: 
+    - ReadWriteOnce
+  size: 8Gi
+
+# Environment variables
+env:
+  NODE_ENV: production
+  PORT: 8000
