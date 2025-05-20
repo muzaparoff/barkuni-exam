@@ -96,16 +96,6 @@ resource "tls_self_signed_cert" "cert" {
   ]
 }
 
-# Import certificate to ACM
-resource "aws_acm_certificate" "cert" {
-  private_key      = tls_private_key.cert.private_key_pem
-  certificate_body = tls_self_signed_cert.cert.cert_pem
-
-  tags = {
-    Name = "barkuni-cert"
-  }
-}
-
 # Create Route53 record
 resource "aws_route53_zone" "main" {
   name = var.domain_name
@@ -164,12 +154,6 @@ resource "kubernetes_service_account" "alb_ingress_controller" {
       "eks.amazonaws.com/role-arn" = aws_iam_role.alb_ingress_controller.arn
     }
   }
-}
-
-# Output certificate ARN for use in Helm values
-output "certificate_arn" {
-  value       = aws_acm_certificate.cert.arn
-  description = "ARN of the ALB certificate in ACM"
 }
 
 # Output cluster endpoint

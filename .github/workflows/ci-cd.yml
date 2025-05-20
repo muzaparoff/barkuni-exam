@@ -98,6 +98,13 @@ jobs:
       - name: Install Helm
         run: |
           curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
+      - name: Create/Update TLS Secret
+        run: |
+          kubectl create secret tls barkuni-tls \
+            --cert=./certs/tls.crt \
+            --key=./certs/tls.key \
+            --namespace default \
+            --dry-run=client -o yaml | kubectl apply -f -
       - name: Deploy with Helm
         run: |
           helm upgrade --install barkuni ./helm/barkuni \
