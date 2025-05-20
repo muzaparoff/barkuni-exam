@@ -14,8 +14,7 @@ resource "kubernetes_ingress" "barkuni" {
       host = "your.domain.com"
       http {
         path {
-          path     = "/"
-          path_type = "Prefix"
+          path = "/"
           backend {
             service_name = "barkuni-service"
             service_port = 5000
