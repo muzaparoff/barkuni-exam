@@ -1,0 +1,51 @@
+clusterName: barkuni-cluster
+region: us-west-2
+vpcId: ${module.vpc.vpc_id}
+
+serviceAccount:
+  create: false
+  name: aws-load-balancer-controller
+  annotations:
+    eks.amazonaws.com/role-arn: ${aws_iam_role.alb_ingress_controller.arn}
+
+image:
+  repository: amazon/aws-load-balancer-controller
+  tag: v2.5.4
+  pullPolicy: IfNotPresent
+
+resources:
+  requests:
+    cpu: 0.1
+    memory: 128Mi
+  limits:
+    cpu: 0.2
+    memory: 256Mi
+
+podAnnotations:
+  cluster-autoscaler.kubernetes.io/safe-to-evict: "true"
+
+securityContext:
+  fsGroup: 65534
+
+serviceMonitor:
+  enabled: true
+  interval: 30s
+  scrapeTimeout: 10s
+  namespace: monitoring
+  additionalLabels:
+    release: prometheus
+
+rbac:
+  serviceAccountAnnotations:
+    eks.amazonaws.com/role-arn: ${aws_iam_role.alb_ingress_controller.arn}
+
+ingressClassParams:
+  enabled: true
+  default: true
+  scheme: internet-facing
+  ipAddressType: ipv4
+  loadBalancerAttributes:
+    idle_timeout.timeout_seconds: "60"
+  tags:
+    Project: barkuni
+    Environment: production 
