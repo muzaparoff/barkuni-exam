@@ -108,8 +108,10 @@ jobs:
           if [ ! -f /usr/local/bin/aws ]; then
             ln -s /usr/local/aws-cli/v2/current/bin/aws /usr/local/bin/aws
           fi
+          export PATH=$PATH:/usr/local/bin:/usr/local/aws-cli/v2/current/bin
       - name: Verify AWS CLI install
         run: |
+          export PATH=$PATH:/usr/local/bin:/usr/local/aws-cli/v2/current/bin
           ls -l /usr/local/bin/aws
           aws --version
       - name: Terraform Init
