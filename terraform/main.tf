@@ -155,15 +155,3 @@ resource "kubernetes_service_account" "alb_ingress_controller" {
     }
   }
 }
-
-# Output cluster endpoint
-output "cluster_endpoint" {
-  value       = module.eks.cluster_endpoint
-  description = "EKS cluster endpoint"
-}
-
-# Output cluster name
-output "cluster_name" {
-  value       = module.eks.cluster_name
-  description = "EKS cluster name"
-}
