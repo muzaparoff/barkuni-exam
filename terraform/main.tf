@@ -166,8 +166,12 @@ resource "random_string" "suffix" {
   special = false
 }
 
+locals {
+  log_group_name = "/aws/eks/barkuni-cluster-${random_string.suffix.result}-${replace(timestamp(), ":", "")}/cluster"
+}
+
 resource "aws_cloudwatch_log_group" "eks" {
-  name = "/aws/eks/barkuni-cluster-${random_string.suffix.result}/cluster"
+  name = local.log_group_name
 
   retention_in_days = 7
 
