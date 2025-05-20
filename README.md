@@ -355,10 +355,6 @@ The project uses GitHub Actions for CI/CD:
 4. Push to the branch
 5. Create a Pull Request
 
-## License
-
-[Add your license information here]
-
 ## Running Locally with Minikube
 
 You can run and test the Barkuni API locally using [Minikube](https://minikube.sigs.k8s.io/):
@@ -435,3 +431,8 @@ You can run and test the Barkuni API locally using [Minikube](https://minikube.s
    - Fix the service name as above, then port-forward and try again.
 
 4. **Update README for clarity**
+
+
+## License
+
+### MIT License
