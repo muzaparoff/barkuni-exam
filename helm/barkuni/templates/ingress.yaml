@@ -8,13 +8,16 @@ metadata:
     alb.ingress.kubernetes.io/target-type: ip
     alb.ingress.kubernetes.io/listen-ports: '[{"HTTP": 80}, {"HTTPS": 443}]'
     alb.ingress.kubernetes.io/ssl-redirect: '443'
-    alb.ingress.kubernetes.io/certificate-arn: {{ .Values.certificateArn }}
     alb.ingress.kubernetes.io/group.name: barkuni
     alb.ingress.kubernetes.io/healthcheck-path: /
     alb.ingress.kubernetes.io/success-codes: '200'
     alb.ingress.kubernetes.io/healthy-threshold-count: '2'
     alb.ingress.kubernetes.io/unhealthy-threshold-count: '2'
 spec:
+  tls:
+    - hosts:
+        - {{ .Values.domainName }}
+      secretName: barkuni-tls
   rules:
     - host: {{ .Values.domainName }}
       http:
@@ -25,4 +28,4 @@ spec:
               service:
                 name: {{ .Release.Name }}-service
                 port:
-                  number: {{ .Values.service.port }} 
+                  number: {{ .Values.service.port }}
