@@ -97,6 +97,12 @@ jobs:
       CLUSTER_NAME: barkuni-eks
     steps:
       - uses: actions/checkout@v4
+      - name: Install AWS CLI
+        run: |
+          apk add --no-cache curl unzip
+          curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
+          unzip awscliv2.zip
+          ./aws/install
       - name: Terraform Init
         run: |
           cd terraform
