@@ -102,18 +102,23 @@ jobs:
           apk add --no-cache curl unzip
           curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
           unzip awscliv2.zip
-          ./aws/install --bin-dir /usr/local/bin --install-dir /usr/local/aws-cli --update
+          ./aws/install --bin-dir /usr/local/bin --install-dir /usr/local/aws-cli --update || true
+          export PATH=$PATH:/usr/local/bin:/usr/local/aws-cli/v2/current/bin
       - name: Symlink AWS CLI if needed
         run: |
-          if [ ! -f /usr/local/bin/aws ]; then
-            ln -s /usr/local/aws-cli/v2/current/bin/aws /usr/local/bin/aws
-          fi
           export PATH=$PATH:/usr/local/bin:/usr/local/aws-cli/v2/current/bin
+          if [ ! -f /usr/local/bin/aws ]; then
+            if [ -f /usr/local/aws-cli/v2/current/bin/aws ]; then
+              ln -s /usr/local/aws-cli/v2/current/bin/aws /usr/local/bin/aws
+            else
+              echo "AWS CLI binary not found!" && exit 1
+            fi
+          fi
       - name: Verify AWS CLI install
         run: |
           export PATH=$PATH:/usr/local/bin:/usr/local/aws-cli/v2/current/bin
           ls -l /usr/local/bin/aws
-          aws --version
+          /usr/local/bin/aws --version
       - name: Terraform Init
         run: |
           cd terraform
