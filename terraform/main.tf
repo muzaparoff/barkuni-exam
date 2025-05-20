@@ -98,13 +98,15 @@ resource "tls_self_signed_cert" "cert" {
   ]
 }
 
-# Create Route53 record
-resource "aws_route53_zone" "main" {
-  name = var.domain_name
+# Reference the existing Route53 hosted zone for vicarius.xyz
+data "aws_route53_zone" "main" {
+  name         = "vicarius.xyz."
+  private_zone = false
 }
 
+# Use the existing zone's ID for records
 resource "aws_route53_record" "app" {
-  zone_id = aws_route53_zone.main.zone_id
+  zone_id = data.aws_route53_zone.main.zone_id
   name    = var.domain_name
   type    = "A"
 
