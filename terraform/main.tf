@@ -87,8 +87,8 @@ resource "tls_self_signed_cert" "cert" {
 
 resource "aws_route53_record" "nginx_ingress" {
   zone_id = data.aws_route53_zone.main.zone_id
-  name    = var.domain_name # e.g., "app.vicarius.xyz"
+  name    = var.domain_name
   type    = "CNAME"
   ttl     = 300
-  records = [var.nginx_lb_dns_name] # Set this variable to the ELB DNS name from above
+  records = [var.nginx_lb_dns_name]
 }

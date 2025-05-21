@@ -15,3 +15,8 @@ variable "domain_name" {
   type        = string
   default     = "barkuni.example.com"
 }
+
+variable "nginx_lb_dns_name" {
+  description = "The DNS name of the NGINX Ingress Controller's AWS LoadBalancer"
+  type        = string
+}
