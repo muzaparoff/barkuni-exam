@@ -118,7 +118,16 @@ jobs:
           if aws iam get-role --role-name eks-alb-ingress-controller; then
             terraform import aws_iam_role.alb_ingress_controller eks-alb-ingress-controller || true
           fi
+      - name: Check if EKS Cluster Exists
+        id: eks_exists
+        run: |
+          if aws eks describe-cluster --name $CLUSTER_NAME --region $AWS_DEFAULT_REGION > /dev/null 2>&1; then
+            echo "exists=true" >> $GITHUB_OUTPUT
+          else
+            echo "exists=false" >> $GITHUB_OUTPUT
+          fi
       - name: Terraform Apply
+        if: steps.eks_exists.outputs.exists == 'false'
         run: |
           cd terraform
           terraform apply -auto-approve

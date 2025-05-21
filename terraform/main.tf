@@ -52,7 +52,7 @@ module "eks" {
   source  = "terraform-aws-modules/eks/aws"
   version = "~> 19.0"
 
-  cluster_name    = "barkuni-cluster-${random_string.suffix.result}"
+  cluster_name    = "barkuni-cluster"
   cluster_version = "1.27"
 
   vpc_id     = module.vpc.vpc_id
@@ -154,7 +154,7 @@ resource "random_string" "suffix" {
 }
 
 locals {
-  log_group_name = "/aws/eks/barkuni-cluster-${random_string.suffix.result}-${replace(timestamp(), ":", "")}/cluster"
+  log_group_name = "/aws/eks/barkuni-cluster/cluster"
 }
 
 resource "aws_cloudwatch_log_group" "eks" {
@@ -169,7 +169,7 @@ resource "aws_cloudwatch_log_group" "eks" {
 }
 
 resource "aws_kms_key" "eks" {
-  description = "EKS cluster ${module.eks.cluster_name} KMS key"
+  description = "EKS cluster barkuni-cluster KMS key"
 
   deletion_window_in_days = 10
 
@@ -180,6 +180,6 @@ resource "aws_kms_key" "eks" {
 }
 
 resource "aws_kms_alias" "eks" {
-  name          = "alias/eks/barkuni-cluster-${random_string.suffix.result}"
+  name          = "alias/eks/barkuni-cluster"
   target_key_id = aws_kms_key.eks.id
 }
