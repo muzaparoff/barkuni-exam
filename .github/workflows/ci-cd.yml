@@ -204,3 +204,20 @@ jobs:
           helm upgrade --install ingress-nginx ingress-nginx/ingress-nginx \
             --namespace ingress-nginx --create-namespace \
             --set controller.publishService.enabled=true
+      - name: Get NGINX Ingress LB DNS Name
+        id: nginx_lb
+        run: |
+          # Wait for the LoadBalancer to be provisioned
+          for i in {1..30}; do
+            LB_DNS=$(kubectl get svc ingress-nginx-controller -n ingress-nginx -o jsonpath='{.status.loadBalancer.ingress[0].hostname}')
+            if [ -n "$LB_DNS" ]; then
+              echo "nginx_lb_dns_name=$LB_DNS" >> $GITHUB_OUTPUT
+              break
+            fi
+            echo "Waiting for NGINX Ingress LB DNS name..."
+            sleep 10
+          done
+      - name: Terraform Apply
+        run: |
+          cd terraform
+          terraform apply -auto-approve -var="nginx_lb_dns_name=${{ steps.nginx_lb.outputs.nginx_lb_dns_name }}"
