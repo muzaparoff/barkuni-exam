@@ -171,9 +171,15 @@ jobs:
             sleep 10
           done
 
+      - name: Install Helm
+        run: |
+          curl -fsSL -o get_helm.sh https://raw.githubusercontent.com/helm/helm/master/scripts/get-helm-3
+          chmod 700 get_helm.sh
+          ./get_helm.sh
+          helm version
+
       - name: Install NGINX Ingress
         run: |
-          # Install NGINX Ingress with custom timeout and settings
           helm repo add ingress-nginx https://kubernetes.github.io/ingress-nginx
           helm repo update
           
