@@ -133,15 +133,62 @@ jobs:
             if [ "$STATUS" = "ACTIVE" ]; then break; fi
             sleep 20
           done
+      - name: Wait for EKS API Server
+        run: |
+          echo "Checking EKS API server connectivity..."
+          for i in {1..45}; do
+            if aws eks describe-cluster --name $CLUSTER_NAME --query cluster.status --output text; then
+              if curl -k -m 10 "https://$(aws eks describe-cluster --name $CLUSTER_NAME --query 'cluster.endpoint' --output text | sed 's/https:\/\///')/healthz"; then
+                echo "EKS API is accessible"
+                break
+              fi
+            fi
+            echo "Waiting for EKS API to be accessible... Attempt $i"
+            sleep 20
+          done
+
+      - name: Configure kubectl with retry
+        run: |
+          for i in {1..5}; do
+            if aws eks update-kubeconfig --name $CLUSTER_NAME --region $AWS_DEFAULT_REGION; then
+              echo "kubectl configured successfully"
+              break
+            fi
+            echo "Retrying kubectl configuration... Attempt $i"
+            sleep 10
+          done
+          
+          # Verify connectivity
+          for i in {1..5}; do
+            if kubectl get nodes; then
+              echo "Kubernetes cluster is accessible"
+              break
+            fi
+            echo "Waiting for cluster access... Attempt $i"
+            sleep 10
+          done
+
       - name: Deploy Application with Helm & Install NGINX
         run: |
-          aws eks update-kubeconfig --name $CLUSTER_NAME --region $AWS_DEFAULT_REGION
-          kubectl get namespace barkuni || kubectl create namespace barkuni
+          kubectl get namespace barkuni || kubectl create namespace barkuni --request-timeout=60s
           curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
-          helm upgrade --install barkuni-api ./helm/barkuni-api --namespace barkuni --wait --timeout 5m
+          
+          # Install Helm charts with increased timeout
+          helm upgrade --install barkuni-api ./helm/barkuni-api \
+            --namespace barkuni \
+            --wait \
+            --timeout 10m \
+            --set connectTimeout=300
+          
           helm repo add ingress-nginx https://kubernetes.github.io/ingress-nginx
           helm repo update
-          helm upgrade --install ingress-nginx ingress-nginx/ingress-nginx --namespace ingress-nginx --create-namespace --set controller.publishService.enabled=true
+          helm upgrade --install ingress-nginx ingress-nginx/ingress-nginx \
+            --namespace ingress-nginx \
+            --create-namespace \
+            --set controller.publishService.enabled=true \
+            --set controller.service.externalTrafficPolicy=Local \
+            --set controller.service.annotations."service\.beta\.kubernetes\.io/aws-load-balancer-type"="nlb" \
+            --timeout 10m
       - name: Get NGINX Ingress LB DNS Name
         id: nginx_lb
         run: |
