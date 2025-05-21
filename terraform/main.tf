@@ -19,14 +19,19 @@ provider "aws" {
   region = var.aws_region
 }
 
+# Reference existing EKS cluster
+data "aws_eks_cluster" "main" {
+  name = "barkuni-exam-cluster"
+}
+
+data "aws_eks_cluster_auth" "main" {
+  name = data.aws_eks_cluster.main.name
+}
+
 provider "kubernetes" {
-  host                   = module.eks.cluster_endpoint
-  cluster_ca_certificate = base64decode(module.eks.cluster_certificate_authority_data)
-  exec {
-    api_version = "client.authentication.k8s.io/v1beta1"
-    command     = "aws"
-    args        = ["eks", "get-token", "--cluster-name", module.eks.cluster_name]
-  }
+  host                   = data.aws_eks_cluster.main.endpoint
+  cluster_ca_certificate = base64decode(data.aws_eks_cluster.main.certificate_authority[0].data)
+  token                  = data.aws_eks_cluster_auth.main.token
 }
 
 data "aws_vpc" "main" {
@@ -51,47 +56,6 @@ data "aws_kms_key" "eks" {
 data "aws_route53_zone" "main" {
   name         = "vicarius.xyz."
   private_zone = false
-}
-
-module "eks" {
-  source  = "terraform-aws-modules/eks/aws"
-  version = "~> 19.0"
-
-  cluster_name    = "${var.project_name}-cluster"
-  cluster_version = "1.27"
-
-  vpc_id     = data.aws_vpc.main.id
-  subnet_ids = ["subnet-0a1a64e07b5b349b5"] # Use your existing subnet(s) here
-
-  # Disable creation of KMS key/alias and CloudWatch log group
-  create_kms_key          = false
-  create_cloudwatch_log_group = false
-
-  # Use your existing KMS key for encryption
-  cluster_encryption_config = {
-    resources        = ["secrets"]
-    provider_key_arn = data.aws_kms_key.eks.arn
-  }
-
-  # Enable logging and specify the existing log group
-  cluster_enabled_log_types = ["api", "audit", "authenticator", "controllerManager", "scheduler"]
-  cloudwatch_log_group_retention_in_days = null # Not needed since you are not creating it
-
-  eks_managed_node_groups = {
-    general = {
-      desired_size = 2
-      min_size     = 1
-      max_size     = 3
-
-      instance_types = ["t3.medium"]
-      capacity_type  = "ON_DEMAND"
-    }
-  }
-
-  tags = {
-    Environment = "production"
-    Project     = "barkuni"
-  }
 }
 
 resource "tls_private_key" "cert" {
