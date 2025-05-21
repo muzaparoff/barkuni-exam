@@ -63,7 +63,6 @@ module "eks" {
   vpc_id     = data.aws_vpc.main.id
   subnet_ids = data.aws_subnets.main.ids
 
-  cloudwatch_log_group_name = data.aws_cloudwatch_log_group.eks.name
   cluster_encryption_config = {
     resources        = ["secrets"]
     provider_key_arn = data.aws_kms_key.eks.arn
