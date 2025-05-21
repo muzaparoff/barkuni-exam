@@ -58,6 +58,11 @@ data "aws_route53_zone" "main" {
   private_zone = false
 }
 
+# Add this data source to get the OIDC provider for the cluster
+data "aws_iam_openid_connect_provider" "eks" {
+  url = data.aws_eks_cluster.main.identity[0].oidc[0].issuer
+}
+
 resource "tls_private_key" "cert" {
   algorithm = "RSA"
   rsa_bits  = 2048
@@ -90,12 +95,12 @@ resource "aws_iam_role" "alb_ingress_controller" {
         Action = "sts:AssumeRoleWithWebIdentity"
         Effect = "Allow"
         Principal = {
-          Federated = module.eks.oidc_provider_arn
+          Federated = data.aws_iam_openid_connect_provider.eks.arn
         }
         Condition = {
           StringEquals = {
-            "${module.eks.oidc_provider}:aud" : "sts.amazonaws.com",
-            "${module.eks.oidc_provider}:sub" : "system:serviceaccount:kube-system:aws-load-balancer-controller"
+            "${replace(data.aws_iam_openid_connect_provider.eks.url, "https://", "")}:aud" : "sts.amazonaws.com",
+            "${replace(data.aws_iam_openid_connect_provider.eks.url, "https://", "")}:sub" : "system:serviceaccount:kube-system:aws-load-balancer-controller"
           }
         }
       }
@@ -118,5 +123,5 @@ resource "kubernetes_service_account" "alb_ingress_controller" {
       "eks.amazonaws.com/role-arn" = aws_iam_role.alb_ingress_controller.arn
     }
   }
-  depends_on = [module.eks]
+  depends_on = [aws_iam_role.alb_ingress_controller]
 }
