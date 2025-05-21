@@ -61,7 +61,7 @@ module "eks" {
   cluster_version = "1.27"
 
   vpc_id     = data.aws_vpc.main.id
-  subnet_ids = data.aws_subnets.main.ids
+  subnet_ids = ["subnet-0a1a64e07b5b349b5"] # Use your existing subnet(s) here
 
   # Disable creation of KMS key/alias and CloudWatch log group
   create_kms_key          = false
