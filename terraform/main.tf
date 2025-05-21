@@ -29,23 +29,28 @@ provider "kubernetes" {
   }
 }
 
-module "vpc" {
-  source = "terraform-aws-modules/vpc/aws"
+data "aws_vpc" "main" {
+  id = "vpc-02fb1f16ffa2c1a11"
+}
 
-  name = "barkuni-vpc"
-  cidr = "10.0.0.0/16"
-
-  azs             = ["${var.aws_region}a", "${var.aws_region}b"]
-  private_subnets = ["10.0.1.0/24", "10.0.2.0/24"]
-  public_subnets  = ["10.0.101.0/24", "10.0.102.0/24"]
-
-  enable_nat_gateway = true
-  single_nat_gateway = true
-
-  tags = {
-    Environment = "production"
-    Project     = "barkuni"
+data "aws_subnets" "main" {
+  filter {
+    name   = "vpc-id"
+    values = [data.aws_vpc.main.id]
   }
+}
+
+data "aws_cloudwatch_log_group" "eks" {
+  name = "/aws/eks/barkuni-exam-cluster/cluster"
+}
+
+data "aws_kms_key" "eks" {
+  key_id = "arn:aws:kms:us-east-1:058264138725:key/c600ebf9-94ec-4cf6-9e5a-1403967190d2"
+}
+
+data "aws_route53_zone" "main" {
+  name         = "vicarius.xyz."
+  private_zone = false
 }
 
 module "eks" {
@@ -55,8 +60,14 @@ module "eks" {
   cluster_name    = "${var.project_name}-cluster"
   cluster_version = "1.27"
 
-  vpc_id     = module.vpc.vpc_id
-  subnet_ids = module.vpc.private_subnets
+  vpc_id     = data.aws_vpc.main.id
+  subnet_ids = data.aws_subnets.main.ids
+
+  cloudwatch_log_group_name = data.aws_cloudwatch_log_group.eks.name
+  cluster_encryption_config = {
+    resources        = ["secrets"]
+    provider_key_arn = data.aws_kms_key.eks.arn
+  }
 
   eks_managed_node_groups = {
     general = {
@@ -95,11 +106,6 @@ resource "tls_self_signed_cert" "cert" {
     "digital_signature",
     "server_auth",
   ]
-}
-
-data "aws_route53_zone" "main" {
-  name         = "vicarius.xyz."
-  private_zone = false
 }
 
 resource "aws_iam_role" "alb_ingress_controller" {
@@ -141,35 +147,4 @@ resource "kubernetes_service_account" "alb_ingress_controller" {
     }
   }
   depends_on = [module.eks]
-}
-
-locals {
-  log_group_name = "/aws/eks/barkuni-exam-cluster/cluster"
-}
-
-resource "aws_cloudwatch_log_group" "eks" {
-  name = local.log_group_name
-
-  retention_in_days = 7
-
-  tags = {
-    Environment = "production"
-    Project     = var.project_name
-  }
-}
-
-resource "aws_kms_key" "eks" {
-  description = "EKS cluster barkuni-cluster KMS key"
-
-  deletion_window_in_days = 10
-
-  tags = {
-    Environment = "production"
-    Project     = var.project_name
-  }
-}
-
-resource "aws_kms_alias" "eks" {
-  name          = "alias/eks/barkuni-exam-cluster"
-  target_key_id = aws_kms_key.eks.id
 }

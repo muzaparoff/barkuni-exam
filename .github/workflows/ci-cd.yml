@@ -127,7 +127,6 @@ jobs:
             echo "exists=false" >> $GITHUB_OUTPUT
           fi
       - name: Terraform Apply
-        if: steps.eks_exists.outputs.exists == 'false'
         run: |
           cd terraform
           terraform apply -auto-approve
