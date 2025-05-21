@@ -63,10 +63,19 @@ module "eks" {
   vpc_id     = data.aws_vpc.main.id
   subnet_ids = data.aws_subnets.main.ids
 
+  # Disable creation of KMS key/alias and CloudWatch log group
+  create_kms_key          = false
+  create_cloudwatch_log_group = false
+
+  # Use your existing KMS key for encryption
   cluster_encryption_config = {
     resources        = ["secrets"]
     provider_key_arn = data.aws_kms_key.eks.arn
   }
+
+  # Enable logging and specify the existing log group
+  cluster_enabled_log_types = ["api", "audit", "authenticator", "controllerManager", "scheduler"]
+  cloudwatch_log_group_retention_in_days = null # Not needed since you are not creating it
 
   eks_managed_node_groups = {
     general = {
