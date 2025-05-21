@@ -207,7 +207,6 @@ jobs:
       - name: Get NGINX Ingress LB DNS Name
         id: nginx_lb
         run: |
-          # Wait for the LoadBalancer to be provisioned
           for i in {1..30}; do
             LB_DNS=$(kubectl get svc ingress-nginx-controller -n ingress-nginx -o jsonpath='{.status.loadBalancer.ingress[0].hostname}')
             if [ -n "$LB_DNS" ]; then
@@ -217,6 +216,11 @@ jobs:
             echo "Waiting for NGINX Ingress LB DNS name..."
             sleep 10
           done
+          # Fail if not found
+          if [ -z "$LB_DNS" ]; then
+            echo "ERROR: NGINX Ingress LoadBalancer DNS name not found." >&2
+            exit 1
+          fi
       - name: Terraform Apply
         run: |
           cd terraform
