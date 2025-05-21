@@ -86,7 +86,7 @@ jobs:
             ${{ secrets.DOCKERHUB_USERNAME }}/barkuni-api:${{ needs.version.outputs.version }}
             ${{ secrets.DOCKERHUB_USERNAME }}/barkuni-api:latest
           platforms: linux/amd64,linux/arm64
-  deploy:
+  deploy-all:
     needs: [build-and-push, manage-certificates]
     runs-on: ubuntu-latest
     container:
@@ -99,71 +99,40 @@ jobs:
       CLUSTER_NAME: barkuni-eks
     steps:
       - uses: actions/checkout@v4
-      - name: Terraform Init
+      - name: Terraform Init and Import (Infra)
         run: |
           cd terraform
           terraform init -backend=false
-      - name: Terraform Import Existing Resources
+          # (Optional: Import existing resources if needed)
+      - name: Terraform Apply (Infra)
         run: |
           cd terraform
-          # Import KMS alias if it exists
-          if aws kms list-aliases --region $AWS_DEFAULT_REGION | grep -q 'alias/eks/barkuni-cluster'; then
-            terraform import 'module.eks.module.kms.aws_kms_alias.this["cluster"]' arn:aws:kms:$AWS_DEFAULT_REGION:$(aws sts get-caller-identity --query Account --output text):alias/eks/barkuni-cluster || true
-          fi
-          # Import CloudWatch log group if it exists
-          if aws logs describe-log-groups --log-group-name-prefix /aws/eks/barkuni-cluster/cluster --region $AWS_DEFAULT_REGION | grep -q '/aws/eks/barkuni-cluster/cluster'; then
-            terraform import 'module.eks.aws_cloudwatch_log_group.this[0]' /aws/eks/barkuni-cluster/cluster || true
-          fi
-      - name: Check if EKS Cluster Exists
-        id: eks_exists
+          terraform apply -auto-approve -target=aws_eks_cluster.main -target=aws_eks_node_group.general
+      - name: Wait for EKS Cluster and Node Group
         run: |
-          if aws eks describe-cluster --name $CLUSTER_NAME --region $AWS_DEFAULT_REGION > /dev/null 2>&1; then
-            echo "exists=true" >> $GITHUB_OUTPUT
-          else
-            echo "exists=false" >> $GITHUB_OUTPUT
-          fi
-      - name: Terraform Apply
-        run: |
-          cd terraform
-          terraform apply -auto-approve
-      - name: Wait for EKS Cluster to be ACTIVE
-        run: |
-          for i in {1..30}; do
+          for i in {1..30}; do 
             STATUS=$(aws eks describe-cluster --name $CLUSTER_NAME --region $AWS_DEFAULT_REGION --query "cluster.status" --output text)
             echo "EKS cluster status: $STATUS"
-            if [ "$STATUS" = "ACTIVE" ]; then
-              break
-            fi
-            sleep 20
+            if [ "$STATUS" = "ACTIVE" ]; then break; fi
+            sleep 20; 
           done
-      - name: Wait for EKS Node Group to be ACTIVE
-        run: |
-          for i in {1..30}; do
+          for i in {1..30}; do 
             STATUS=$(aws eks describe-nodegroup --cluster-name $CLUSTER_NAME --nodegroup-name general --region $AWS_DEFAULT_REGION --query "nodegroup.status" --output text)
-            echo "EKS node group status: $STATUS"
-            if [ "$STATUS" = "ACTIVE" ]; then
-              break
-            fi
-            sleep 20
+            echo "Node group status: $STATUS"
+            if [ "$STATUS" = "ACTIVE" ]; then break; fi
+            sleep 20; 
           done
-      - name: Configure Kubectl
+      - name: Configure Kubectl & Create Namespace
         run: |
           aws eks update-kubeconfig --name $CLUSTER_NAME --region $AWS_DEFAULT_REGION
           kubectl get nodes
-      - name: Create barkuni Namespace
-        run: |
           kubectl get namespace barkuni || kubectl create namespace barkuni
       - name: Create/Update TLS Secret
         run: |
-          kubectl create secret tls barkuni-tls \
-            --cert=./certs/tls.crt \
-            --key=./certs/tls.key \
-            --namespace barkuni || true
-      - name: Install Helm
+          kubectl create secret tls barkuni-tls --cert=./certs/tls.crt --key=./certs/tls.key --namespace barkuni || true
+      - name: Install Helm & Deploy Application
         run: |
           curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
-      - name: Deploy with Helm
-        run: |
           helm upgrade --install barkuni-api ./helm/barkuni-api \
             --namespace barkuni \
             --set serviceAccount.name=barkuni-api-sa \
@@ -189,14 +158,7 @@ jobs:
             --set image.pullPolicy=IfNotPresent \
             --set image.repository=${{ secrets.DOCKERHUB_USERNAME }}/barkuni-api \
             --set image.tag=${{ needs.build-and-push.outputs.tags }} \
-            --namespace barkuni \
-            --wait --timeout 5m  
-      - name: Wait for Deployment
-        run: |
-          kubectl rollout status deployment/barkuni-api --namespace barkuni --timeout=5m
-      - name: Wait for Service
-        run: |
-          kubectl wait --for=condition=available --timeout=5m deployment/barkuni-api --namespace barkuni
+            --wait --timeout 5m
       - name: Install NGINX Ingress Controller
         run: |
           helm repo add ingress-nginx https://kubernetes.github.io/ingress-nginx
@@ -216,15 +178,14 @@ jobs:
             echo "Waiting for NGINX Ingress LB DNS name..."
             sleep 10
           done
-          # Fail if not found
           if [ -z "$LB_DNS" ]; then
             echo "ERROR: NGINX Ingress LoadBalancer DNS name not found." >&2
             exit 1
           fi
-      - name: Terraform Apply
+      - name: Terraform Apply (DNS)
         run: |
           cd terraform
           echo "nginx_lb_dns_name=${{ steps.nginx_lb.outputs.nginx_lb_dns_name }}"
-          terraform apply -auto-approve -var="nginx_lb_dns_name=${{ steps.nginx_lb.outputs.nginx_lb_dns_name }}"
+          terraform apply -auto-approve -target=aws_route53_record.nginx_ingress -var="nginx_lb_dns_name=${{ steps.nginx_lb.outputs.nginx_lb_dns_name }}"
         env:
           nginx_lb_dns_name: ${{ steps.nginx_lb.outputs.nginx_lb_dns_name }}
