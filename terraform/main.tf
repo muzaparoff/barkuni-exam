@@ -75,7 +75,6 @@ module "eks" {
   }
 }
 
-# Create self-signed certificate
 resource "tls_private_key" "cert" {
   algorithm = "RSA"
   rsa_bits  = 2048
@@ -98,13 +97,11 @@ resource "tls_self_signed_cert" "cert" {
   ]
 }
 
-# Reference the existing Route53 hosted zone for vicarius.xyz
 data "aws_route53_zone" "main" {
   name         = "vicarius.xyz."
   private_zone = false
 }
 
-# Create IAM role for ALB Ingress Controller
 resource "aws_iam_role" "alb_ingress_controller" {
   name = "eks-alb-ingress-controller"
 
@@ -128,7 +125,6 @@ resource "aws_iam_role" "alb_ingress_controller" {
   })
 }
 
-# Attach ALB Ingress Controller policy to the role
 resource "aws_iam_role_policy" "alb_ingress_controller" {
   name = "alb-ingress-controller"
   role = aws_iam_role.alb_ingress_controller.id
@@ -136,7 +132,6 @@ resource "aws_iam_role_policy" "alb_ingress_controller" {
   policy = file("${path.module}/policies/alb-ingress-policy.json")
 }
 
-# Create Kubernetes service account for ALB Ingress Controller
 resource "kubernetes_service_account" "alb_ingress_controller" {
   metadata {
     name      = "aws-load-balancer-controller"
