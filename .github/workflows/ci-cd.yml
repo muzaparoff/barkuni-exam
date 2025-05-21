@@ -171,8 +171,13 @@ jobs:
             sleep 10
           done
 
-      - name: Install Helm
+      - name: Install Prerequisites and Helm
         run: |
+          # Install OpenSSL and other required packages
+          apt-get update && apt-get install -y curl openssl ca-certificates
+
+          # Install Helm with verification disabled (since we're in a container)
+          export VERIFY_CHECKSUM=false
           curl -fsSL -o get_helm.sh https://raw.githubusercontent.com/helm/helm/master/scripts/get-helm-3
           chmod 700 get_helm.sh
           ./get_helm.sh
