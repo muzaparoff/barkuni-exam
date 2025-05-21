@@ -85,63 +85,10 @@ resource "tls_self_signed_cert" "cert" {
   ]
 }
 
-resource "aws_iam_role" "alb_ingress_controller" {
-  name = "eks-alb-ingress-controller"
-
-  assume_role_policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [
-      {
-        Action = "sts:AssumeRoleWithWebIdentity"
-        Effect = "Allow"
-        Principal = {
-          Federated = data.aws_iam_openid_connect_provider.eks.arn
-        }
-        Condition = {
-          StringEquals = {
-            "${replace(data.aws_iam_openid_connect_provider.eks.url, "https://", "")}:aud" : "sts.amazonaws.com",
-            "${replace(data.aws_iam_openid_connect_provider.eks.url, "https://", "")}:sub" : "system:serviceaccount:kube-system:aws-load-balancer-controller"
-          }
-        }
-      }
-    ]
-  })
-}
-
-resource "aws_iam_role_policy" "alb_ingress_controller" {
-  name = "alb-ingress-controller"
-  role = aws_iam_role.alb_ingress_controller.id
-
-  policy = file("${path.module}/policies/alb-ingress-policy.json")
-}
-
-resource "kubernetes_service_account" "alb_ingress_controller" {
-  metadata {
-    name      = "aws-load-balancer-controller"
-    namespace = "kube-system"
-    annotations = {
-      "eks.amazonaws.com/role-arn" = aws_iam_role.alb_ingress_controller.arn
-    }
-  }
-  depends_on = [aws_iam_role.alb_ingress_controller]
-}
-
-resource "aws_eks_node_group" "general" {
-  cluster_name    = data.aws_eks_cluster.main.name
-  node_group_name = "general"
-  node_role_arn   = "arn:aws:iam::058264138725:role/general-eks-node-group-20250520133836818000000001"
-  subnet_ids      = data.aws_subnets.main.ids
-
-  scaling_config {
-    desired_size = 1
-    min_size     = 1
-    max_size     = 3
-  }
-
-  instance_types = ["t3.medium"]
-
-  tags = {
-    Environment = "production"
-    Project     = "barkuni"
-  }
+resource "aws_route53_record" "nginx_ingress" {
+  zone_id = data.aws_route53_zone.main.zone_id
+  name    = var.domain_name # e.g., "app.vicarius.xyz"
+  type    = "CNAME"
+  ttl     = 300
+  records = [var.nginx_lb_dns_name] # Set this variable to the ELB DNS name from above
 }

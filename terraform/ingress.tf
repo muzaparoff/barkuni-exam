@@ -1,7 +1,7 @@
 resource "kubernetes_ingress" "barkuni" {
   metadata {
     name      = "barkuni"
-    namespace = "default"
+    namespace = "barkuni"
   }
 
   spec {

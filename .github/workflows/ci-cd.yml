@@ -114,10 +114,6 @@ jobs:
           if aws logs describe-log-groups --log-group-name-prefix /aws/eks/barkuni-cluster/cluster --region $AWS_DEFAULT_REGION | grep -q '/aws/eks/barkuni-cluster/cluster'; then
             terraform import 'module.eks.aws_cloudwatch_log_group.this[0]' /aws/eks/barkuni-cluster/cluster || true
           fi
-          # Import IAM role if it exists
-          if aws iam get-role --role-name eks-alb-ingress-controller; then
-            terraform import aws_iam_role.alb_ingress_controller eks-alb-ingress-controller || true
-          fi
       - name: Check if EKS Cluster Exists
         id: eks_exists
         run: |
@@ -201,3 +197,10 @@ jobs:
       - name: Wait for Service
         run: |
           kubectl wait --for=condition=available --timeout=5m deployment/barkuni-api --namespace barkuni
+      - name: Install NGINX Ingress Controller
+        run: |
+          helm repo add ingress-nginx https://kubernetes.github.io/ingress-nginx
+          helm repo update
+          helm upgrade --install ingress-nginx ingress-nginx/ingress-nginx \
+            --namespace ingress-nginx --create-namespace \
+            --set controller.publishService.enabled=true
