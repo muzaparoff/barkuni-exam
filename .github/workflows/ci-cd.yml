@@ -224,4 +224,7 @@ jobs:
       - name: Terraform Apply
         run: |
           cd terraform
+          echo "nginx_lb_dns_name=${{ steps.nginx_lb.outputs.nginx_lb_dns_name }}"
           terraform apply -auto-approve -var="nginx_lb_dns_name=${{ steps.nginx_lb.outputs.nginx_lb_dns_name }}"
+        env:
+          nginx_lb_dns_name: ${{ steps.nginx_lb.outputs.nginx_lb_dns_name }}
