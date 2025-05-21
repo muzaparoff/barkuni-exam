@@ -125,3 +125,32 @@ resource "kubernetes_service_account" "alb_ingress_controller" {
   }
   depends_on = [aws_iam_role.alb_ingress_controller]
 }
+
+# Try to find an existing node group named "general"
+data "aws_eks_node_group" "general" {
+  cluster_name    = data.aws_eks_cluster.main.name
+  node_group_name = "general"
+  # If not found, this will error, so we use 'count' logic below
+  count = 0 # Only used for reference, not for creation
+}
+
+resource "aws_eks_node_group" "general" {
+  count           = length(try(data.aws_eks_node_group.general.id, "")) == 0 ? 1 : 0
+  cluster_name    = data.aws_eks_cluster.main.name
+  node_group_name = "general"
+  node_role_arn   = "arn:aws:iam::058264138725:role/general-eks-node-group-20250520133836818000000001"
+  subnet_ids      = data.aws_subnets.main.ids
+
+  scaling_config {
+    desired_size = 2
+    min_size     = 1
+    max_size     = 3
+  }
+
+  instance_types = ["t3.medium"]
+
+  tags = {
+    Environment = "production"
+    Project     = "barkuni"
+  }
+}
