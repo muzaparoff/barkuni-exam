@@ -82,5 +82,34 @@ data "aws_eks_node_group" "general" {
   node_group_name = var.node_group_name
 }
 
+# Get the security group ID associated with the EKS cluster
+data "aws_security_group" "eks_cluster" {
+  vpc_id = data.aws_vpc.main.id
+  tags = {
+    "aws:eks:cluster-name" = data.aws_eks_cluster.main.name
+  }
+}
+
+# Allow inbound access to the EKS API endpoint
+resource "aws_security_group_rule" "eks_api" {
+  type              = "ingress"
+  from_port         = 443
+  to_port           = 443
+  protocol          = "tcp"
+  cidr_blocks       = ["0.0.0.0/0"]  # Consider restricting this to specific IPs
+  security_group_id = data.aws_security_group.eks_cluster.id
+}
+
+# Update cluster endpoint access policy
+resource "aws_eks_cluster_update_config" "example" {
+  name = data.aws_eks_cluster.main.name
+  
+  vpc_config {
+    endpoint_private_access = true
+    endpoint_public_access  = true
+    public_access_cidrs    = ["0.0.0.0/0"]  # Consider restricting this to specific IPs
+  }
+}
+
 # ... Add any additional infrastructure-defined resources (e.g. application deployments, etc.) ...
 

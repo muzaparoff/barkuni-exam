@@ -149,24 +149,21 @@ jobs:
 
       - name: Configure kubectl with retry
         run: |
-          for i in {1..5}; do
-            if aws eks update-kubeconfig --name $CLUSTER_NAME --region $AWS_DEFAULT_REGION; then
-              echo "kubectl configured successfully"
-              break
-            fi
-            echo "Retrying kubectl configuration... Attempt $i"
-            sleep 10
-          done
+          # Get cluster endpoint
+          CLUSTER_ENDPOINT=$(aws eks describe-cluster --name $CLUSTER_NAME --query "cluster.endpoint" --output text)
+          echo "Cluster endpoint: $CLUSTER_ENDPOINT"
           
-          # Verify connectivity
-          for i in {1..5}; do
-            if kubectl get nodes; then
-              echo "Kubernetes cluster is accessible"
-              break
-            fi
-            echo "Waiting for cluster access... Attempt $i"
-            sleep 10
-          done
+          # Test network connectivity
+          timeout 10 bash -c "</dev/tcp/$(echo $CLUSTER_ENDPOINT | sed 's|https://||')/443" || echo "Network connectivity test failed"
+          
+          # Configure kubectl with increased timeout
+          aws eks update-kubeconfig \
+            --name $CLUSTER_NAME \
+            --region $AWS_DEFAULT_REGION \
+            --kubernetes-network-config '{"apiServerTimeout": "60s"}'
+
+          # Test API server connection with verbose output
+          kubectl get nodes -v=6 --request-timeout='60s'
 
       - name: Deploy Application with Helm & Install NGINX
         run: |
