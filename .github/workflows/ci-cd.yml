@@ -103,7 +103,22 @@ jobs:
         run: |
           cd terraform/infrastructure
           terraform init -backend=false
-          terraform apply -auto-approve
+          # Copy terraform.tfvars values as CLI arguments in case tfvars file is not picked up
+          terraform apply -auto-approve \
+            -var="aws_region=$AWS_DEFAULT_REGION" \
+            -var="eks_cluster_name=$CLUSTER_NAME" \
+            -var="vpc_id=vpc-02fb1f16ffa2c1a11" \
+            -var="cloudwatch_log_group_name=/aws/eks/barkuni-exam-cluster/cluster" \
+            -var="kms_key_id=arn:aws:kms:us-east-1:058264138725:key/c600ebf9-94ec-4cf6-9e5a-1403967190d2" \
+            -var="domain_name=vicarius.xyz" \
+            -var="organization_name=Barkuni" \
+            -var="node_group_name=general" \
+            -var="node_role_arn=arn:aws:iam::058264138725:role/general-eks-node-group-20250520133836818000000001" \
+            -var="node_desired_size=2" \
+            -var="node_min_size=1" \
+            -var="node_max_size=3" \
+            -var='node_instance_types=["t3.medium"]' \
+            -var="project_name=barkuni"
       - name: Wait for EKS Cluster and Node Group
         run: |
           for i in {1..30}; do 
