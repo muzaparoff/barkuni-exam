@@ -87,22 +87,3 @@ data "aws_eks_node_group" "general" {
   node_group_name = var.node_group_name
 }
 
-# Get the security group ID associated with the EKS cluster
-data "aws_security_group" "cluster" {
-  vpc_id = data.aws_vpc.main.id
-  tags = {
-    "aws:eks:cluster-name" = data.aws_eks_cluster.main.name
-  }
-}
-
-# Allow inbound access to the EKS API endpoint
-resource "aws_security_group_rule" "cluster_api" {
-  type              = "ingress"
-  from_port         = 443
-  to_port           = 443
-  protocol          = "tcp"
-  cidr_blocks       = ["0.0.0.0/0"]
-  security_group_id = data.aws_security_group.cluster.id
-  description       = "Allow inbound HTTPS access to the EKS API endpoint"
-}
-
