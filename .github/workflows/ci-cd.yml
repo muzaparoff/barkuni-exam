@@ -122,9 +122,30 @@ jobs:
         run: |
           cd terraform
           terraform apply -auto-approve
+      - name: Wait for EKS Cluster to be ACTIVE
+        run: |
+          for i in {1..30}; do
+            STATUS=$(aws eks describe-cluster --name $CLUSTER_NAME --region $AWS_DEFAULT_REGION --query "cluster.status" --output text)
+            echo "EKS cluster status: $STATUS"
+            if [ "$STATUS" = "ACTIVE" ]; then
+              break
+            fi
+            sleep 20
+          done
+      - name: Wait for EKS Node Group to be ACTIVE
+        run: |
+          for i in {1..30}; do
+            STATUS=$(aws eks describe-nodegroup --cluster-name $CLUSTER_NAME --nodegroup-name general --region $AWS_DEFAULT_REGION --query "nodegroup.status" --output text)
+            echo "EKS node group status: $STATUS"
+            if [ "$STATUS" = "ACTIVE" ]; then
+              break
+            fi
+            sleep 20
+          done
       - name: Configure Kubectl
         run: |
           aws eks update-kubeconfig --name $CLUSTER_NAME --region $AWS_DEFAULT_REGION
+          kubectl get nodes
       - name: Create barkuni Namespace
         run: |
           kubectl get namespace barkuni || kubectl create namespace barkuni
