@@ -377,7 +377,7 @@ You can run and test the Barkuni API locally using [Minikube](https://minikube.s
    chmod +x scripts/start_minikube.sh
    cd scripts
    ./start_minikube.sh
-   ```
+   ``` 
 
 3. The script will:
    - Start Minikube with Docker driver
