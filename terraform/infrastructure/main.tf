@@ -77,24 +77,9 @@ resource "tls_self_signed_cert" "cert" {
   ]
 }
 
-resource "aws_eks_node_group" "general" {
+data "aws_eks_node_group" "general" {
   cluster_name    = data.aws_eks_cluster.main.name
   node_group_name = var.node_group_name
-  node_role_arn   = var.node_role_arn
-  subnet_ids      = data.aws_subnets.main.ids
-
-  scaling_config {
-    desired_size = var.node_desired_size
-    min_size     = var.node_min_size
-    max_size     = var.node_max_size
-  }
-
-  instance_types = var.node_instance_types
-
-  tags = {
-    Environment = "production"
-    Project     = var.project_name
-  }
 }
 
 # ... Add any additional infrastructure-defined resources (e.g. application deployments, etc.) ...
