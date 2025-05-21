@@ -52,7 +52,7 @@ module "eks" {
   source  = "terraform-aws-modules/eks/aws"
   version = "~> 19.0"
 
-  cluster_name    = "barkuni-cluster"
+  cluster_name    = "${var.project_name}-cluster"
   cluster_version = "1.27"
 
   vpc_id     = module.vpc.vpc_id
@@ -145,16 +145,11 @@ resource "kubernetes_service_account" "alb_ingress_controller" {
       "eks.amazonaws.com/role-arn" = aws_iam_role.alb_ingress_controller.arn
     }
   }
-}
-
-resource "random_string" "suffix" {
-  length  = 6
-  upper   = false
-  special = false
+  depends_on = [module.eks]
 }
 
 locals {
-  log_group_name = "/aws/eks/barkuni-cluster/cluster"
+  log_group_name = "/aws/eks/barkuni-exam-cluster/cluster"
 }
 
 resource "aws_cloudwatch_log_group" "eks" {
@@ -164,7 +159,7 @@ resource "aws_cloudwatch_log_group" "eks" {
 
   tags = {
     Environment = "production"
-    Project     = "barkuni"
+    Project     = var.project_name
   }
 }
 
@@ -175,11 +170,11 @@ resource "aws_kms_key" "eks" {
 
   tags = {
     Environment = "production"
-    Project     = "barkuni"
+    Project     = var.project_name
   }
 }
 
 resource "aws_kms_alias" "eks" {
-  name          = "alias/eks/barkuni-cluster"
+  name          = "alias/eks/barkuni-exam-cluster"
   target_key_id = aws_kms_key.eks.id
 }
