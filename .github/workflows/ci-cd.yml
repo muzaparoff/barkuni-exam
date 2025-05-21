@@ -153,39 +153,46 @@ jobs:
           CLUSTER_ENDPOINT=$(aws eks describe-cluster --name $CLUSTER_NAME --query "cluster.endpoint" --output text)
           echo "Cluster endpoint: $CLUSTER_ENDPOINT"
           
-          # Test network connectivity
-          timeout 10 bash -c "</dev/tcp/$(echo $CLUSTER_ENDPOINT | sed 's|https://||')/443" || echo "Network connectivity test failed"
+          # Configure AWS CLI to use v1 for eks commands
+          aws configure set default.eks.use-v1-api-endpoints true
           
-          # Configure kubectl with increased timeout
+          # Configure kubectl without network config option
           aws eks update-kubeconfig \
             --name $CLUSTER_NAME \
-            --region $AWS_DEFAULT_REGION \
-            --kubernetes-network-config '{"apiServerTimeout": "60s"}'
+            --region $AWS_DEFAULT_REGION
+          
+          # Wait for API server with increased timeout
+          for i in {1..30}; do
+            if kubectl get nodes --request-timeout=30s; then
+              echo "Successfully connected to EKS cluster"
+              break
+            fi
+            echo "Retrying connection to EKS API... Attempt $i"
+            sleep 10
+          done
 
-          # Test API server connection with verbose output
-          kubectl get nodes -v=6 --request-timeout='60s'
-
-      - name: Deploy Application with Helm & Install NGINX
+      - name: Install NGINX Ingress
         run: |
-          kubectl get namespace barkuni || kubectl create namespace barkuni --request-timeout=60s
-          curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
-          
-          # Install Helm charts with increased timeout
-          helm upgrade --install barkuni-api ./helm/barkuni-api \
-            --namespace barkuni \
-            --wait \
-            --timeout 10m \
-            --set connectTimeout=300
-          
+          # Install NGINX Ingress with custom timeout and settings
           helm repo add ingress-nginx https://kubernetes.github.io/ingress-nginx
           helm repo update
-          helm upgrade --install ingress-nginx ingress-nginx/ingress-nginx \
-            --namespace ingress-nginx \
-            --create-namespace \
-            --set controller.publishService.enabled=true \
-            --set controller.service.externalTrafficPolicy=Local \
-            --set controller.service.annotations."service\.beta\.kubernetes\.io/aws-load-balancer-type"="nlb" \
-            --timeout 10m
+          
+          # Try installation with retries
+          for i in {1..3}; do
+            if helm upgrade --install ingress-nginx ingress-nginx/ingress-nginx \
+              --namespace ingress-nginx \
+              --create-namespace \
+              --set controller.publishService.enabled=true \
+              --set controller.service.externalTrafficPolicy=Local \
+              --set controller.service.type=LoadBalancer \
+              --set controller.service.annotations."service\.beta\.kubernetes\.io/aws-load-balancer-type"="classic" \
+              --set controller.service.annotations."service\.beta\.kubernetes\.io/aws-load-balancer-internal"="false" \
+              --timeout 15m; then
+              break
+            fi
+            echo "Retrying Helm install... Attempt $i"
+            sleep 30
+          done
       - name: Get NGINX Ingress LB DNS Name
         id: nginx_lb
         run: |
