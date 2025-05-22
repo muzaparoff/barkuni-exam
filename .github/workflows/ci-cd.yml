@@ -251,7 +251,15 @@ jobs:
           helm repo add eks https://aws.github.io/eks-charts
           helm repo update
           
-          # Install the AWS Load Balancer Controller
+          # First remove any existing installation
+          helm uninstall aws-load-balancer-controller -n kube-system || true
+          sleep 30  # Wait for cleanup
+          
+          # Check if any resources are still present
+          echo "Checking for leftover resources..."
+          kubectl get all -n kube-system -l app.kubernetes.io/name=aws-load-balancer-controller
+          
+          # Install the AWS Load Balancer Controller with uninstall-wait
           helm install aws-load-balancer-controller eks/aws-load-balancer-controller \
             --namespace kube-system \
             --set clusterName=$CLUSTER_NAME \
@@ -261,7 +269,9 @@ jobs:
             --set vpcId=vpc-02fb1f16ffa2c1a11 \
             --set image.repository=602401143452.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/amazon/aws-load-balancer-controller \
             --debug \
-            --wait
+            --wait \
+            --timeout 5m \
+            --replace
 
           # Verify installation
           kubectl get deployment -n kube-system aws-load-balancer-controller
