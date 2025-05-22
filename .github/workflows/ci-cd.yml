@@ -218,6 +218,28 @@ jobs:
           ./get_helm.sh
           helm version
 
+      - name: Install AWS Load Balancer Controller
+        run: |
+          # Add EKS chart repo
+          helm repo add eks https://aws.github.io/eks-charts
+          helm repo update
+          
+          # Install the AWS Load Balancer Controller
+          helm install aws-load-balancer-controller eks/aws-load-balancer-controller \
+            --namespace kube-system \
+            --set clusterName=$CLUSTER_NAME \
+            --set serviceAccount.create=true \
+            --set serviceAccount.name=aws-load-balancer-controller \
+            --set region=$AWS_DEFAULT_REGION \
+            --set vpcId=vpc-02fb1f16ffa2c1a11 \
+            --set image.repository=602401143452.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/amazon/aws-load-balancer-controller \
+            --debug \
+            --wait
+
+          # Verify installation
+          kubectl get deployment -n kube-system aws-load-balancer-controller
+          kubectl get pods -n kube-system -l app.kubernetes.io/name=aws-load-balancer-controller
+
       - name: Install NGINX Ingress
         run: |
           helm repo add ingress-nginx https://kubernetes.github.io/ingress-nginx
