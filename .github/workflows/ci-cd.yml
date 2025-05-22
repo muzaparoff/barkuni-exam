@@ -298,38 +298,24 @@ jobs:
 
       - name: Install NGINX Ingress with Enhanced Debug
         run: |
-          # Add ingress-nginx repository first
           helm repo add ingress-nginx https://kubernetes.github.io/ingress-nginx
           helm repo update
-          
-          # First remove any existing installation
-          helm uninstall ingress-nginx -n ingress-nginx || true
-          kubectl delete namespace ingress-nginx || true
-          
-          # Wait for namespace cleanup
-          sleep 30
-          
-          # Verify networking prerequisites
-          echo "Checking networking prerequisites..."
-          VPC_ID=$(aws eks describe-cluster --name $CLUSTER_NAME --query "cluster.resourcesVpcConfig.vpcId" --output text)
-          aws ec2 describe-subnets \
-            --filters "Name=vpc-id,Values=$VPC_ID" \
-            --query 'Subnets[*].[SubnetId,AvailabilityZone,MapPublicIpOnLaunch]'
-          
-          # Verify chart is available
-          helm search repo ingress-nginx/ingress-nginx --version '>0.0.0'
-          
-          # Install with more specific annotations
+
+          # Install with deployment configuration
           helm install ingress-nginx ingress-nginx/ingress-nginx \
             --namespace ingress-nginx \
             --create-namespace \
+            --set controller.kind=Deployment \
+            --set controller.minReadySeconds=0 \
+            --set controller.progressDeadlineSeconds=600 \
             --set controller.service.annotations."service\.beta\.kubernetes\.io/aws-load-balancer-type"="nlb" \
             --set controller.service.annotations."service\.beta\.kubernetes\.io/aws-load-balancer-scheme"="internet-facing" \
             --set controller.service.annotations."service\.beta\.kubernetes\.io/aws-load-balancer-proxy-protocol"="*" \
             --set controller.service.annotations."service\.beta\.kubernetes\.io/aws-load-balancer-cross-zone-load-balancing-enabled"="true" \
             --set controller.service.annotations."service\.beta\.kubernetes\.io/aws-load-balancer-ssl-ports"="443" \
-            --set controller.service.targetPorts.http=http \
-            --set controller.service.targetPorts.https=http \
+            --set controller.service.type=LoadBalancer \
+            --set controller.service.targetPorts.http=80 \
+            --set controller.service.targetPorts.https=443 \
             --set controller.config.use-proxy-protocol=true \
             --debug \
             --timeout 10m \
