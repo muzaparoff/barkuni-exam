@@ -301,56 +301,50 @@ jobs:
           helm repo add ingress-nginx https://kubernetes.github.io/ingress-nginx
           helm repo update
 
-          # First remove any existing installation
+          # Remove any existing installation
           helm uninstall ingress-nginx -n ingress-nginx || true
           kubectl delete namespace ingress-nginx --grace-period=0 --force || true
           sleep 30
 
           # Create namespace first
-          kubectl create namespace ingress-nginx
+          kubectl create namespace ingress-nginx || true
 
-          # Install with modified configuration
+          # Debug: Check AWS Load Balancer Controller logs before install
+          echo "AWS Load Balancer Controller logs before install:"
+          kubectl logs -n kube-system -l app.kubernetes.io/name=aws-load-balancer-controller --tail=50 || true
+
+          # Install with minimal config to isolate issue
           helm install ingress-nginx ingress-nginx/ingress-nginx \
             --namespace ingress-nginx \
             --set controller.kind=Deployment \
             --set controller.replicaCount=1 \
-            --set controller.minReadySeconds=20 \
-            --set controller.progressDeadlineSeconds=600 \
-            --set controller.admissionWebhooks.enabled=false \
             --set controller.service.enabled=true \
             --set controller.service.type=LoadBalancer \
             --set controller.service.annotations."service\.beta\.kubernetes\.io/aws-load-balancer-type"="nlb" \
             --set controller.service.annotations."service\.beta\.kubernetes\.io/aws-load-balancer-scheme"="internet-facing" \
-            --set controller.service.annotations."service\.beta\.kubernetes\.io/aws-load-balancer-nlb-target-type"="instance" \
-            --set controller.livenessProbe.initialDelaySeconds=30 \
-            --set controller.readinessProbe.initialDelaySeconds=30 \
+            --set controller.admissionWebhooks.enabled=false \
+            --set controller.minReadySeconds=10 \
+            --set controller.progressDeadlineSeconds=600 \
             --set controller.resources.requests.cpu=100m \
             --set controller.resources.requests.memory=90Mi \
             --set controller.resources.limits.cpu=200m \
             --set controller.resources.limits.memory=180Mi \
             --debug \
-            --timeout 15m \
+            --timeout 10m \
             --wait \
             --atomic
 
-          # Verify deployment status
-          kubectl rollout status deployment/ingress-nginx-controller -n ingress-nginx --timeout=5m
-          
-          # Debug info
+          # Debug info after install
           echo "Deployment Status:"
-          kubectl describe deployment ingress-nginx-controller -n ingress-nginx
-          
+          kubectl describe deployment ingress-nginx-controller -n ingress-nginx || true
           echo "Service Status:"
-          kubectl describe service ingress-nginx-controller -n ingress-nginx
-          
+          kubectl describe service ingress-nginx-controller -n ingress-nginx || true
           echo "Pod Status:"
-          kubectl get pods -n ingress-nginx -o wide
-          
+          kubectl get pods -n ingress-nginx -o wide || true
           echo "Events:"
-          kubectl get events -n ingress-nginx --sort-by='.lastTimestamp'
-          
-          echo "AWS Load Balancer Controller logs:"
-          kubectl logs -n kube-system -l app.kubernetes.io/name=aws-load-balancer-controller --tail=50
+          kubectl get events -n ingress-nginx --sort-by='.lastTimestamp' || true
+          echo "AWS Load Balancer Controller logs after install:"
+          kubectl logs -n kube-system -l app.kubernetes.io/name=aws-load-balancer-controller --tail=50 || true
       - name: Get NGINX Ingress LB DNS Name
         id: nginx_lb
         run: |
