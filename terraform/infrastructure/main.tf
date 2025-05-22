@@ -86,8 +86,16 @@ data "aws_iam_role" "aws_load_balancer_controller" {
   name = "aws-load-balancer-controller"
 }
 
-data "aws_iam_role_policy_attachment" "aws_load_balancer_controller" {
+# Replace data source with resource for policy attachment since it's not supported
+resource "aws_iam_role_policy_attachment" "aws_load_balancer_controller" {
   policy_arn = data.aws_iam_policy.aws_load_balancer_controller.arn
   role       = data.aws_iam_role.aws_load_balancer_controller.name
+
+  lifecycle {
+    # Add lifecycle policy to prevent destruction
+    prevent_destroy = true
+    # Ignore changes to handle existing attachment
+    ignore_changes = all
+  }
 }
 
