@@ -1,9 +1,10 @@
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
-  name: {{ .Release.Name }}-ingress
+  name: "{{ .Release.Name }}-ingress"
   annotations:
     kubernetes.io/ingress.class: nginx
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "120"
 spec:
   tls:
     - hosts:
@@ -17,6 +18,6 @@ spec:
             pathType: Prefix
             backend:
               service:
-                name: {{ .Release.Name }}-service
+                name: "{{ .Release.Name }}-service"
                 port:
                   number: {{ .Values.service.port }}
