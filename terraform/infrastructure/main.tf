@@ -104,13 +104,13 @@ data "aws_iam_policy" "eks_elb_policy" {
   name = "EKSLoadBalancerPolicy"
 }
 
-# Attach the existing ELB policy to the cluster role
+# Keep role policy attachment but reference existing policy
 resource "aws_iam_role_policy_attachment" "eks_elb_policy_attachment" {
   policy_arn = data.aws_iam_policy.eks_elb_policy.arn
   role       = data.aws_iam_role.aws_load_balancer_controller.name
 
   lifecycle {
-    create_before_destroy = true
+    ignore_changes = [policy_arn]
   }
 }
 
