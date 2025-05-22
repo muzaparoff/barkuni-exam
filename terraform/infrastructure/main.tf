@@ -50,35 +50,7 @@ data "aws_iam_openid_connect_provider" "eks" {
   url = data.aws_eks_cluster.main.identity[0].oidc[0].issuer
 }
 
-# Use data source for existing IAM policy
-data "aws_iam_policy" "aws_load_balancer_controller" {
-  name = "AWSLoadBalancerControllerIAMPolicy"
-}
-
-# Use data source for existing role
-data "aws_iam_role" "aws_load_balancer_controller" {
-  name = "aws-load-balancer-controller"
-}
-
-data "aws_vpc" "main" {
-  id = var.vpc_id
-}
-
-data "aws_subnets" "main" {
-  filter {
-    name   = "vpc-id"
-    values = [data.aws_vpc.main.id]
-  }
-}
-
-data "aws_cloudwatch_log_group" "eks" {
-  name = var.cloudwatch_log_group_name
-}
-
-data "aws_kms_key" "eks" {
-  key_id = var.kms_key_id
-}
-
+# Keep TLS certificate generation
 resource "tls_private_key" "cert" {
   algorithm = "RSA"
   rsa_bits  = 2048
@@ -105,108 +77,17 @@ data "aws_eks_node_group" "general" {
   node_group_name = var.node_group_name
 }
 
-# Create IAM policy for AWS Load Balancer Controller
-resource "aws_iam_policy" "aws_load_balancer_controller" {
-  name        = "AWSLoadBalancerControllerIAMPolicy"
-  description = "Policy for AWS Load Balancer Controller"
-
-  policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [
-      {
-        Effect = "Allow"
-        Action = [
-          "iam:CreateServiceLinkedRole"
-        ]
-        Resource = "*"
-        Condition = {
-          StringEquals = {
-            "iam:AWSServiceName": "elasticloadbalancing.amazonaws.com"
-          }
-        }
-      },
-      {
-        Effect = "Allow"
-        Action = [
-          "ec2:DescribeAccountAttributes",
-          "ec2:DescribeAddresses",
-          "ec2:DescribeAvailabilityZones",
-          "ec2:DescribeInternetGateways",
-          "ec2:DescribeVpcs",
-          "ec2:DescribeSubnets",
-          "ec2:DescribeSecurityGroups",
-          "ec2:DescribeInstances",
-          "ec2:DescribeNetworkInterfaces",
-          "ec2:DescribeTags",
-          "ec2:GetCoipPoolUsage",
-          "ec2:DescribeCoipPools",
-          "elasticloadbalancing:DescribeLoadBalancers",
-          "elasticloadbalancing:DescribeLoadBalancerAttributes",
-          "elasticloadbalancing:DescribeListeners",
-          "elasticloadbalancing:DescribeListenerCertificates",
-          "elasticloadbalancing:DescribeSSLPolicies",
-          "elasticloadbalancing:DescribeRules",
-          "elasticloadbalancing:DescribeTargetGroups",
-          "elasticloadbalancing:DescribeTargetGroupAttributes",
-          "elasticloadbalancing:DescribeTargetHealth",
-          "elasticloadbalancing:DescribeTags",
-          "elasticloadbalancing:CreateLoadBalancer",
-          "elasticloadbalancing:CreateTargetGroup"
-        ]
-        Resource = "*"
-      },
-      {
-        Effect = "Allow"
-        Action = [
-          "elasticloadbalancing:RegisterTargets",
-          "elasticloadbalancing:DeregisterTargets"
-        ]
-        Resource = "arn:aws:elasticloadbalancing:*:*:targetgroup/*/*"
-      },
-      {
-        Effect = "Allow"
-        Action = [
-          "elasticloadbalancing:ModifyLoadBalancerAttributes",
-          "elasticloadbalancing:SetIpAddressType",
-          "elasticloadbalancing:SetSecurityGroups",
-          "elasticloadbalancing:SetSubnets",
-          "elasticloadbalancing:DeleteLoadBalancer",
-          "elasticloadbalancing:ModifyTargetGroup",
-          "elasticloadbalancing:ModifyTargetGroupAttributes",
-          "elasticloadbalancing:DeleteTargetGroup"
-        ]
-        Resource = "*"
-      }
-    ]
-  })
+# Use data sources for existing AWS Load Balancer Controller resources
+data "aws_iam_policy" "aws_load_balancer_controller" {
+  name = "AWSLoadBalancerControllerIAMPolicy"
 }
 
-# Create IAM role for the service account
-resource "aws_iam_role" "aws_load_balancer_controller" {
+data "aws_iam_role" "aws_load_balancer_controller" {
   name = "aws-load-balancer-controller"
-
-  assume_role_policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [
-      {
-        Effect = "Allow"
-        Principal = {
-          Federated = "arn:aws:iam::${data.aws_caller_identity.current.account_id}:oidc-provider/${replace(data.aws_eks_cluster.main.identity[0].oidc[0].issuer, "https://", "")}"
-        }
-        Action = "sts:AssumeRoleWithWebIdentity"
-        Condition = {
-          StringEquals = {
-            "${replace(data.aws_eks_cluster.main.identity[0].oidc[0].issuer, "https://", "")}:sub": "system:serviceaccount:kube-system:aws-load-balancer-controller"
-          }
-        }
-      }
-    ]
-  })
 }
 
-# Attach the policy to the role
-resource "aws_iam_role_policy_attachment" "aws_load_balancer_controller" {
-  policy_arn = aws_iam_policy.aws_load_balancer_controller.arn
-  role       = aws_iam_role.aws_load_balancer_controller.name
+data "aws_iam_role_policy_attachment" "aws_load_balancer_controller" {
+  policy_arn = data.aws_iam_policy.aws_load_balancer_controller.arn
+  role       = data.aws_iam_role.aws_load_balancer_controller.name
 }
 
