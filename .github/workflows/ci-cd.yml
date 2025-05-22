@@ -227,36 +227,29 @@ jobs:
           kubectl get nodes -o wide
           kubectl get pods -A
           
-          # Install NGINX Ingress with corrected deployment settings
-          helm upgrade --install ingress-nginx ingress-nginx/ingress-nginx \
+          # Remove existing deployment if exists
+          helm uninstall ingress-nginx -n ingress-nginx || true
+          kubectl delete namespace ingress-nginx || true
+          sleep 10
+          
+          # Simplified installation with explicit deployment settings
+          helm install ingress-nginx ingress-nginx/ingress-nginx \
             --namespace ingress-nginx \
             --create-namespace \
-            --set controller.publishService.enabled=true \
+            --set controller.kind=Deployment \
+            --set controller.replicaCount=1 \
+            --set controller.minReadySeconds=10 \
+            --set-string controller.progressDeadlineSeconds=600 \
+            --set controller.service.enabled=true \
             --set controller.service.type=LoadBalancer \
             --set controller.service.annotations."service\.beta\.kubernetes\.io/aws-load-balancer-type"="nlb" \
-            --set controller.deployment.minReadySeconds=10 \
-            --set controller.deployment.progressDeadlineSeconds=120 \
-            --set-string controller.deployment.minReadySeconds=10 \
-            --set-string controller.deployment.progressDeadlineSeconds=120 \
-            --set controller.replicaCount=1 \
-            --set controller.resources.requests.cpu=100m \
-            --set controller.resources.requests.memory=90Mi \
-            --set controller.resources.limits.cpu=200m \
-            --set controller.resources.limits.memory=180Mi \
+            --set controller.service.annotations."service\.beta\.kubernetes\.io/aws-load-balancer-scheme"="internet-facing" \
+            --set controller.publishService.enabled=true \
             --wait \
-            --debug \
-            --timeout 15m \
-            --atomic
+            --timeout 10m
 
-          # Debug deployment status
-          echo "Deployment status:"
-          kubectl get deployments -n ingress-nginx -o wide
-          kubectl describe deployment ingress-nginx-controller -n ingress-nginx
-          
-          # Debug service status
-          echo "Service status:"
-          kubectl get svc -n ingress-nginx
-          kubectl describe svc ingress-nginx-controller -n ingress-nginx
+          # Verify deployment
+          kubectl -n ingress-nginx rollout status deployment ingress-nginx-controller
       - name: Get NGINX Ingress LB DNS Name
         id: nginx_lb
         run: |
