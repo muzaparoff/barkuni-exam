@@ -267,58 +267,72 @@ jobs:
           kubectl get deployment -n kube-system aws-load-balancer-controller
           kubectl get pods -n kube-system -l app.kubernetes.io/name=aws-load-balancer-controller
 
-      - name: Install NGINX Ingress
+      - name: Verify AWS Load Balancer Controller Installation
         run: |
-          helm repo add ingress-nginx https://kubernetes.github.io/ingress-nginx
-          helm repo update
+          echo "Checking AWS Load Balancer Controller status..."
+          kubectl get deployment -n kube-system aws-load-balancer-controller -o wide
+          kubectl get pods -n kube-system -l app.kubernetes.io/name=aws-load-balancer-controller -o wide
           
-          echo "Current cluster state:"
-          kubectl get nodes -o wide
-          kubectl get pods -A
+          # Check associated service account and roles
+          kubectl get serviceaccount -n kube-system aws-load-balancer-controller
           
-          # Remove existing deployment if exists
+          # Check AWS Load Balancer Controller logs
+          kubectl logs -n kube-system -l app.kubernetes.io/name=aws-load-balancer-controller
+          
+          # Verify node IAM roles have necessary permissions
+          echo "Checking Node IAM Role..."
+          aws iam simulate-principal-policy \
+            --policy-source-arn $(aws eks describe-nodegroup --cluster-name $CLUSTER_NAME --nodegroup-name general --query 'nodegroup.nodeRole' --output text) \
+            --action-names ec2:DescribeSubnets elasticloadbalancing:* \
+            --resource-arns '*'
+
+      - name: Install NGINX Ingress with Enhanced Debug
+        run: |
+          # First remove any existing installation
           helm uninstall ingress-nginx -n ingress-nginx || true
-          kubectl delete namespace ingress-nginx --timeout=5m || true
-          sleep 30  # Increased sleep to ensure cleanup
+          kubectl delete namespace ingress-nginx || true
           
-          # Debug cluster state after cleanup
-          echo "Cluster state after cleanup:"
-          kubectl get ns
-          kubectl get pods -A
+          # Wait for namespace cleanup
+          sleep 30
           
-          # Install with debug flags and increased timeout
-          HELM_DEBUG=true helm install ingress-nginx ingress-nginx/ingress-nginx \
+          # Verify networking prerequisites
+          echo "Checking networking prerequisites..."
+          VPC_ID=$(aws eks describe-cluster --name $CLUSTER_NAME --query "cluster.resourcesVpcConfig.vpcId" --output text)
+          aws ec2 describe-subnets \
+            --filters "Name=vpc-id,Values=$VPC_ID" \
+            --query 'Subnets[*].[SubnetId,AvailabilityZone,MapPublicIpOnLaunch]'
+          
+          # Install with more specific annotations
+          helm install ingress-nginx ingress-nginx/ingress-nginx \
             --namespace ingress-nginx \
             --create-namespace \
-            --debug \
-            --dry-run > ingress-nginx-debug.yaml
-          
-          echo "Dry run output:"
-          cat ingress-nginx-debug.yaml
-          
-          HELM_DEBUG=true helm install ingress-nginx ingress-nginx/ingress-nginx \
-            --namespace ingress-nginx \
-            --create-namespace \
-            --debug \
-            --set controller.kind=Deployment \
-            --set controller.replicaCount=1 \
-            --set controller.minReadySeconds=10 \
-            --set-string controller.progressDeadlineSeconds=600 \
-            --set controller.service.enabled=true \
-            --set controller.service.type=LoadBalancer \
             --set controller.service.annotations."service\.beta\.kubernetes\.io/aws-load-balancer-type"="nlb" \
             --set controller.service.annotations."service\.beta\.kubernetes\.io/aws-load-balancer-scheme"="internet-facing" \
-            --set controller.publishService.enabled=true \
-            --set controller.config.timeout-connect=120s \
-            --set controller.config.timeout-read=120s \
-            --set controller.config.timeout-write=120s \
-            --timeout 20m \
+            --set controller.service.annotations."service\.beta\.kubernetes\.io/aws-load-balancer-proxy-protocol"="*" \
+            --set controller.service.annotations."service\.beta\.kubernetes\.io/aws-load-balancer-cross-zone-load-balancing-enabled"="true" \
+            --set controller.service.annotations."service\.beta\.kubernetes\.io/aws-load-balancer-ssl-ports"="443" \
+            --set controller.service.targetPorts.http=http \
+            --set controller.service.targetPorts.https=http \
+            --set controller.config.use-proxy-protocol=true \
+            --debug \
+            --timeout 10m \
             --wait
+
+          # Enhanced debugging after installation
+          echo "Pod status:"
+          kubectl get pods -n ingress-nginx -o wide
           
-          echo "Post-installation state:"
-          kubectl get all -n ingress-nginx
-          kubectl describe deployment ingress-nginx-controller -n ingress-nginx
-          kubectl logs -n ingress-nginx -l app.kubernetes.io/component=controller --tail=100
+          echo "Service status:"
+          kubectl get svc -n ingress-nginx -o wide
+          
+          echo "Service details:"
+          kubectl describe svc ingress-nginx-controller -n ingress-nginx
+          
+          echo "Events in namespace:"
+          kubectl get events -n ingress-nginx --sort-by='.lastTimestamp'
+          
+          echo "AWS Load Balancer Controller logs:"
+          kubectl logs -n kube-system -l app.kubernetes.io/name=aws-load-balancer-controller --tail=50
       - name: Get NGINX Ingress LB DNS Name
         id: nginx_lb
         run: |
