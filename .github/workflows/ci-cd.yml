@@ -223,29 +223,29 @@ jobs:
           helm repo add ingress-nginx https://kubernetes.github.io/ingress-nginx
           helm repo update
           
-          # Debug current cluster state
           echo "Current cluster state:"
           kubectl get nodes -o wide
           kubectl get pods -A
           
-          # Install NGINX Ingress with proper deployment settings
+          # Add --set-string to ensure values are treated as strings
           helm upgrade --install ingress-nginx ingress-nginx/ingress-nginx \
             --namespace ingress-nginx \
             --create-namespace \
             --set controller.publishService.enabled=true \
-            --set controller.service.externalTrafficPolicy=Local \
             --set controller.service.type=LoadBalancer \
             --set controller.service.annotations."service\.beta\.kubernetes\.io/aws-load-balancer-type"="nlb" \
-            --set controller.deployment.minReadySeconds=0 \
-            --set controller.deployment.progressDeadlineSeconds=600 \
+            --set-string controller.deployment.minReadySeconds="20" \
+            --set-string controller.deployment.progressDeadlineSeconds="300" \
             --set controller.deployment.strategy.type=RollingUpdate \
             --set controller.deployment.strategy.rollingUpdate.maxUnavailable=1 \
             --set controller.deployment.strategy.rollingUpdate.maxSurge=1 \
-            --set controller.replicaCount=2 \
+            --set controller.replicaCount=1 \
             --set controller.resources.requests.cpu=100m \
             --set controller.resources.requests.memory=90Mi \
-            --timeout 15m \
+            --set controller.resources.limits.cpu=200m \
+            --set controller.resources.limits.memory=180Mi \
             --debug \
+            --timeout 15m \
             --wait
 
           # Debug deployment status
