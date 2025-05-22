@@ -1,7 +1,7 @@
 replicaCount: 1
 
 image:
-  repository: barkuni-api
+  repository: muzaparoff/barkuni-api
   pullPolicy: IfNotPresent
   tag: "latest"
 

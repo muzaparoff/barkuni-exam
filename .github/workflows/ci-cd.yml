@@ -313,6 +313,21 @@ jobs:
           echo "AWS Load Balancer Controller logs before install:"
           kubectl logs -n kube-system -l app.kubernetes.io/name=aws-load-balancer-controller --tail=50 || true
 
+          # Debug: Print service account and rolebinding info
+          echo "ServiceAccounts in kube-system:"
+          kubectl get serviceaccounts -n kube-system
+          echo "RoleBindings in kube-system:"
+          kubectl get rolebindings -n kube-system
+
+          # Debug: Print subnets and tags
+          echo "Subnets and tags:"
+          VPC_ID=$(aws eks describe-cluster --name $CLUSTER_NAME --query "cluster.resourcesVpcConfig.vpcId" --output text)
+          aws ec2 describe-subnets --filters "Name=vpc-id,Values=$VPC_ID" --query 'Subnets[*].{SubnetId:SubnetId,Tags:Tags}' --output table
+
+          # Debug: Print security groups
+          echo "Security Groups:"
+          aws ec2 describe-security-groups --filters Name=vpc-id,Values=$VPC_ID --query 'SecurityGroups[*].{GroupId:GroupId,GroupName:GroupName}' --output table
+
           # Install with minimal config to isolate issue
           helm install ingress-nginx ingress-nginx/ingress-nginx \
             --namespace ingress-nginx \
