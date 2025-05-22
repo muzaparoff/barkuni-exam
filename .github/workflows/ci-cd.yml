@@ -298,6 +298,10 @@ jobs:
 
       - name: Install NGINX Ingress with Enhanced Debug
         run: |
+          # Add ingress-nginx repository first
+          helm repo add ingress-nginx https://kubernetes.github.io/ingress-nginx
+          helm repo update
+          
           # First remove any existing installation
           helm uninstall ingress-nginx -n ingress-nginx || true
           kubectl delete namespace ingress-nginx || true
@@ -311,6 +315,9 @@ jobs:
           aws ec2 describe-subnets \
             --filters "Name=vpc-id,Values=$VPC_ID" \
             --query 'Subnets[*].[SubnetId,AvailabilityZone,MapPublicIpOnLaunch]'
+          
+          # Verify chart is available
+          helm search repo ingress-nginx/ingress-nginx --version '>0.0.0'
           
           # Install with more specific annotations
           helm install ingress-nginx ingress-nginx/ingress-nginx \
