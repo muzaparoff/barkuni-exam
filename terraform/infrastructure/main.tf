@@ -99,41 +99,14 @@ resource "aws_iam_role_policy_attachment" "aws_load_balancer_controller" {
   }
 }
 
-# Create additional IAM policy for ELB permissions
-resource "aws_iam_policy" "eks_elb_policy" {
-  name        = "EKSLoadBalancerPolicy"
-  description = "Policy for EKS cluster to manage ELB"
-
-  policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [
-      {
-        Effect = "Allow"
-        Action = [
-          "elasticloadbalancing:CreateLoadBalancer",
-          "elasticloadbalancing:CreateTargetGroup",
-          "elasticloadbalancing:DeleteLoadBalancer",
-          "elasticloadbalancing:DeleteTargetGroup",
-          "elasticloadbalancing:DescribeLoadBalancers",
-          "elasticloadbalancing:DescribeTargetGroups",
-          "elasticloadbalancing:DescribeTargetHealth",
-          "elasticloadbalancing:ModifyLoadBalancerAttributes",
-          "elasticloadbalancing:RegisterTargets",
-          "elasticloadbalancing:DeregisterTargets"
-        ]
-        Resource = "*"
-      }
-    ]
-  })
-
-  lifecycle {
-    create_before_destroy = true
-  }
+# Use existing EKS LoadBalancer policy
+data "aws_iam_policy" "eks_elb_policy" {
+  name = "EKSLoadBalancerPolicy"
 }
 
-# Attach the ELB policy to the cluster role
+# Attach the existing ELB policy to the cluster role
 resource "aws_iam_role_policy_attachment" "eks_elb_policy_attachment" {
-  policy_arn = aws_iam_policy.eks_elb_policy.arn
+  policy_arn = data.aws_iam_policy.eks_elb_policy.arn
   role       = data.aws_iam_role.aws_load_balancer_controller.name
 
   lifecycle {
