@@ -301,55 +301,52 @@ jobs:
           helm repo add ingress-nginx https://kubernetes.github.io/ingress-nginx
           helm repo update
 
-          # Force cleanup of any existing installation
+          # First remove any existing installation
           helm uninstall ingress-nginx -n ingress-nginx || true
           kubectl delete namespace ingress-nginx --grace-period=0 --force || true
-          
-          # Wait and verify cleanup
-          echo "Waiting for cleanup..."
-          for i in {1..30}; do
-            if ! kubectl get namespace ingress-nginx 2>/dev/null; then
-              echo "Namespace deleted successfully"
-              break
-            fi
-            echo "Waiting for namespace deletion... Attempt $i"
-            sleep 5
-          done
-          
-          # Double-check no helm releases exist
-          if helm list -n ingress-nginx 2>/dev/null | grep -q ingress-nginx; then
-            echo "Forcing helm release cleanup..."
-            helm delete ingress-nginx -n ingress-nginx --no-hooks || true
-          fi
+          sleep 30
 
-          # Install with deployment configuration
+          # Create namespace first
+          kubectl create namespace ingress-nginx
+
+          # Install with modified configuration
           helm install ingress-nginx ingress-nginx/ingress-nginx \
             --namespace ingress-nginx \
-            --create-namespace \
             --set controller.kind=Deployment \
-            --set controller.minReadySeconds=10 \
+            --set controller.replicaCount=1 \
+            --set controller.minReadySeconds=20 \
             --set controller.progressDeadlineSeconds=600 \
+            --set controller.admissionWebhooks.enabled=false \
+            --set controller.service.enabled=true \
+            --set controller.service.type=LoadBalancer \
             --set controller.service.annotations."service\.beta\.kubernetes\.io/aws-load-balancer-type"="nlb" \
             --set controller.service.annotations."service\.beta\.kubernetes\.io/aws-load-balancer-scheme"="internet-facing" \
-            --set controller.service.type=LoadBalancer \
-            --set controller.service.targetPorts.http=80 \
-            --set controller.service.targetPorts.https=443 \
-            --replace \
-            --wait \
+            --set controller.service.annotations."service\.beta\.kubernetes\.io/aws-load-balancer-nlb-target-type"="instance" \
+            --set controller.livenessProbe.initialDelaySeconds=30 \
+            --set controller.readinessProbe.initialDelaySeconds=30 \
+            --set controller.resources.requests.cpu=100m \
+            --set controller.resources.requests.memory=90Mi \
+            --set controller.resources.limits.cpu=200m \
+            --set controller.resources.limits.memory=180Mi \
             --debug \
-            --timeout 10m
+            --timeout 15m \
+            --wait \
+            --atomic
 
-          # Enhanced debugging after installation
-          echo "Pod status:"
+          # Verify deployment status
+          kubectl rollout status deployment/ingress-nginx-controller -n ingress-nginx --timeout=5m
+          
+          # Debug info
+          echo "Deployment Status:"
+          kubectl describe deployment ingress-nginx-controller -n ingress-nginx
+          
+          echo "Service Status:"
+          kubectl describe service ingress-nginx-controller -n ingress-nginx
+          
+          echo "Pod Status:"
           kubectl get pods -n ingress-nginx -o wide
           
-          echo "Service status:"
-          kubectl get svc -n ingress-nginx -o wide
-          
-          echo "Service details:"
-          kubectl describe svc ingress-nginx-controller -n ingress-nginx
-          
-          echo "Events in namespace:"
+          echo "Events:"
           kubectl get events -n ingress-nginx --sort-by='.lastTimestamp'
           
           echo "AWS Load Balancer Controller logs:"

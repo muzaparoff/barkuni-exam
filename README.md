@@ -196,3 +196,81 @@ aws ec2 describe-security-groups --filters Name=vpc-id,Values=$VPC_ID
    - Verify IAM roles and policies
    - Ensure subnets are tagged properly
    - Check security group permissions
+
+## EC2 Instance Management
+
+### Prerequisites
+- Python 3.x
+- boto3 (`pip install boto3`)
+- AWS credentials configured in `~/.aws/credentials` or environment variables
+
+### EC2 Creation Script Features
+- Create instances in specific subnets
+- Support multiple OS types via AMI IDs
+- Custom instance types
+- SSH key pair assignment
+- Security group configuration
+- Custom tagging support
+
+### Common AMI IDs by Region (us-east-1)
+- Amazon Linux 2023: ami-0230bd60aa48260c6
+- Ubuntu 22.04: ami-0261755bbcb8c4a84
+- Windows Server 2022: ami-0d86c69530d0a048e
+
+### Usage Examples
+
+1. Basic instance creation:
+```bash
+python scripts/create_ec2.py \
+  --subnet-id subnet-xxx \
+  --ami-id ami-0230bd60aa48260c6
+```
+
+2. Advanced configuration:
+```bash
+python scripts/create_ec2.py \
+  --subnet-id subnet-xxx \
+  --ami-id ami-0230bd60aa48260c6 \
+  --instance-type t2.small \
+  --key-name my-ssh-key \
+  --security-groups sg-xxx sg-yyy \
+  --tags Name=webserver Environment=dev Project=barkuni
+```
+
+### Available Options
+- `--subnet-id`: (Required) Subnet ID where to launch instance
+- `--ami-id`: (Required) AMI ID to use
+- `--instance-type`: Instance type (default: t2.micro)
+- `--key-name`: SSH key pair name
+- `--security-groups`: List of security group IDs
+- `--tags`: List of tags in key=value format
+
+### Output Information
+- Instance ID
+- Instance State
+- Public IP (if available)
+- Private IP
+
+## License
+
+MIT License
+
+Copyright (c) 2025 Barkuni
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
