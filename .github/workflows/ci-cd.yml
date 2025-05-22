@@ -229,13 +229,28 @@ jobs:
           
           # Remove existing deployment if exists
           helm uninstall ingress-nginx -n ingress-nginx || true
-          kubectl delete namespace ingress-nginx || true
-          sleep 10
+          kubectl delete namespace ingress-nginx --timeout=5m || true
+          sleep 30  # Increased sleep to ensure cleanup
           
-          # Simplified installation with explicit deployment settings
-          helm install ingress-nginx ingress-nginx/ingress-nginx \
+          # Debug cluster state after cleanup
+          echo "Cluster state after cleanup:"
+          kubectl get ns
+          kubectl get pods -A
+          
+          # Install with debug flags and increased timeout
+          HELM_DEBUG=true helm install ingress-nginx ingress-nginx/ingress-nginx \
             --namespace ingress-nginx \
             --create-namespace \
+            --debug \
+            --dry-run > ingress-nginx-debug.yaml
+          
+          echo "Dry run output:"
+          cat ingress-nginx-debug.yaml
+          
+          HELM_DEBUG=true helm install ingress-nginx ingress-nginx/ingress-nginx \
+            --namespace ingress-nginx \
+            --create-namespace \
+            --debug \
             --set controller.kind=Deployment \
             --set controller.replicaCount=1 \
             --set controller.minReadySeconds=10 \
@@ -245,11 +260,16 @@ jobs:
             --set controller.service.annotations."service\.beta\.kubernetes\.io/aws-load-balancer-type"="nlb" \
             --set controller.service.annotations."service\.beta\.kubernetes\.io/aws-load-balancer-scheme"="internet-facing" \
             --set controller.publishService.enabled=true \
-            --wait \
-            --timeout 10m
-
-          # Verify deployment
-          kubectl -n ingress-nginx rollout status deployment ingress-nginx-controller
+            --set controller.config.timeout-connect=120s \
+            --set controller.config.timeout-read=120s \
+            --set controller.config.timeout-write=120s \
+            --timeout 20m \
+            --wait
+          
+          echo "Post-installation state:"
+          kubectl get all -n ingress-nginx
+          kubectl describe deployment ingress-nginx-controller -n ingress-nginx
+          kubectl logs -n ingress-nginx -l app.kubernetes.io/component=controller --tail=100
       - name: Get NGINX Ingress LB DNS Name
         id: nginx_lb
         run: |
