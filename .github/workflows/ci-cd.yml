@@ -222,24 +222,41 @@ jobs:
         run: |
           helm repo add ingress-nginx https://kubernetes.github.io/ingress-nginx
           helm repo update
+          
+          # Debug current cluster state
+          echo "Current cluster state:"
+          kubectl get nodes -o wide
+          kubectl get pods -A
+          
+          # Install NGINX Ingress with proper deployment settings
+          helm upgrade --install ingress-nginx ingress-nginx/ingress-nginx \
+            --namespace ingress-nginx \
+            --create-namespace \
+            --set controller.publishService.enabled=true \
+            --set controller.service.externalTrafficPolicy=Local \
+            --set controller.service.type=LoadBalancer \
+            --set controller.service.annotations."service\.beta\.kubernetes\.io/aws-load-balancer-type"="nlb" \
+            --set controller.deployment.minReadySeconds=0 \
+            --set controller.deployment.progressDeadlineSeconds=600 \
+            --set controller.deployment.strategy.type=RollingUpdate \
+            --set controller.deployment.strategy.rollingUpdate.maxUnavailable=1 \
+            --set controller.deployment.strategy.rollingUpdate.maxSurge=1 \
+            --set controller.replicaCount=2 \
+            --set controller.resources.requests.cpu=100m \
+            --set controller.resources.requests.memory=90Mi \
+            --timeout 15m \
+            --debug \
+            --wait
 
-          # Explicitly set progressDeadlineSeconds to a valid value (default is 600)
-          for i in {1..3}; do
-            if helm upgrade --install ingress-nginx ingress-nginx/ingress-nginx \
-              --namespace ingress-nginx \
-              --create-namespace \
-              --set controller.publishService.enabled=true \
-              --set controller.service.externalTrafficPolicy=Local \
-              --set controller.service.type=LoadBalancer \
-              --set controller.service.annotations."service\.beta\.kubernetes\.io/aws-load-balancer-type"="classic" \
-              --set controller.service.annotations."service\.beta\.kubernetes\.io/aws-load-balancer-internal"="false" \
-              --set controller.deployment.progressDeadlineSeconds=600 \
-              --timeout 15m; then
-              break
-            fi
-            echo "Retrying Helm install... Attempt $i"
-            sleep 30
-          done
+          # Debug deployment status
+          echo "Deployment status:"
+          kubectl get deployments -n ingress-nginx -o wide
+          kubectl describe deployment ingress-nginx-controller -n ingress-nginx
+          
+          # Debug service status
+          echo "Service status:"
+          kubectl get svc -n ingress-nginx
+          kubectl describe svc ingress-nginx-controller -n ingress-nginx
       - name: Get NGINX Ingress LB DNS Name
         id: nginx_lb
         run: |
